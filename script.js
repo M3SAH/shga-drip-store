@@ -701,14 +701,14 @@ const initEvents = () => {
       $$(".filter-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       state.activeCategory = btn.dataset.filter;
-      renderProducts();
+      window.renderProducts();
     });
   });
 
   priceFilter.addEventListener("input", () => {
     state.maxPrice = parseInt(priceFilter.value, 10);
     priceDisplay.textContent = formatPrice(state.maxPrice);
-    renderProducts();
+    window.renderProducts();
   });
 
   modal.querySelector(".modal-close").addEventListener("click", closeModal);

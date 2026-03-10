@@ -10,7 +10,7 @@
   // -----------------------------
   // Config
   // -----------------------------
-  const PAGE_SIZE = 24;
+  const PAGE_SIZE = 20;
 
   // -----------------------------
   // Helpers
@@ -64,7 +64,7 @@
     maxPrice: 50000,
     search: "",
     sort: "recent",
-    rendered: 0,
+    currentPage: 1,
     currentList: [],
   };
 
@@ -76,9 +76,8 @@
   const priceDisplay = $("priceDisplay");
   const searchInput = $("collectionsSearch");
   const sortSelect = $("collectionsSort");
-  const loadMoreBtn = $("loadMoreBtn");
   const countEl = $("collectionsCount");
-  const sentinel = $("loadMoreSentinel");
+  const paginationContainer = $("paginationContainer");
 
   if (!grid) return;
 
@@ -104,45 +103,47 @@
     return filtered;
   }
 
-  function updateCountUI(total) {
+  function updateCountUI(total, pageNum) {
     if (!countEl) return;
     if (total === 0) {
       countEl.textContent = "No products found.";
       return;
     }
-    const shown = Math.min(state.rendered, total);
-    countEl.textContent = `Showing ${shown.toLocaleString("en-NG")} of ${total.toLocaleString("en-NG")} products`;
+    const page = pageNum || state.currentPage || 1;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const start =
+      total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const end = Math.min(total, page * PAGE_SIZE);
+    countEl.textContent =
+      total === 0
+        ? "No products found."
+        : `Showing ${start.toLocaleString(
+            "en-NG",
+          )}\u2013${end.toLocaleString(
+            "en-NG",
+          )} of ${total.toLocaleString("en-NG")} products (Page ${page} of ${totalPages})`;
   }
 
-  function setLoadMoreVisible(total) {
-    const hasMore = state.rendered < total;
-    if (loadMoreBtn) loadMoreBtn.style.display = hasMore ? "inline-flex" : "none";
-    if (sentinel) sentinel.style.display = hasMore ? "block" : "none";
-  }
-
-  function clearAndPrime(list) {
-    grid.innerHTML = "";
-    state.currentList = list;
-    state.rendered = 0;
-    appendNextChunk();
-  }
-
-  function appendNextChunk() {
+  function renderPage(pageNum) {
     const list = state.currentList || [];
-    if (state.rendered >= list.length) {
-      setLoadMoreVisible(list.length);
-      updateCountUI(list.length);
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const page = Math.min(Math.max(pageNum, 1), totalPages);
+    state.currentPage = page;
+
+    grid.innerHTML = "";
+    if (total === 0) {
+      updateCountUI(0, 1);
       return;
     }
 
-    const next = list.slice(state.rendered, state.rendered + PAGE_SIZE);
+    const startIdx = (page - 1) * PAGE_SIZE;
+    const next = list.slice(startIdx, startIdx + PAGE_SIZE);
     const frag = document.createDocumentFragment();
 
     for (const product of next) {
-      const a = document.createElement("a");
-      a.className = "product-card product-card-link";
-      a.href = buildProductUrl(product);
-      a.setAttribute("aria-label", `View ${product.name}`);
+      const card = document.createElement("div");
+      card.className = "product-card product-card--collections";
 
       const outOfStock = Number(product.stock) === 0;
       const isFixedPrice =
@@ -156,38 +157,128 @@
         ? `<span class="card-out-of-stock-badge">Out of Stock</span>`
         : "";
 
-      a.innerHTML = `
-        <div class="card-image">
-          <img
-            src="${product.image || product.imageUrl || ""}"
-            alt="${product.name}"
-            loading="lazy"
-            decoding="async"
-            onerror="this.parentElement.style.background='var(--black-3)'; this.style.display='none'"
-          />
-          ${stockBadge}
-        </div>
-        <div class="card-body">
-          <p class="card-cat">${product.category || ""}</p>
-          <h3 class="card-name">${product.name || ""}</h3>
-          <p class="card-price">${priceLabel}</p>
-          <span class="card-cta">${outOfStock ? "View details" : "View Product"}</span>
-        </div>
+      const href = buildProductUrl(product);
+
+      card.innerHTML = `
+        <a
+          class="product-card-link"
+          href="${href}"
+          aria-label="View ${product.name}"
+        >
+          <div class="card-image">
+            <img
+              src="${product.image || product.imageUrl || ""}"
+              alt="${product.name}"
+              loading="lazy"
+              decoding="async"
+              onerror="this.parentElement.style.background='var(--black-3)'; this.style.display='none'"
+            />
+            ${stockBadge}
+          </div>
+          <div class="card-body">
+            <p class="card-cat">${product.category || ""}</p>
+            <h3 class="card-name">${product.name || ""}</h3>
+            <p class="card-price">${priceLabel}</p>
+            <span class="card-cta">${outOfStock ? "View details" : "View Product"}</span>
+          </div>
+        </a>
       `;
 
-      frag.appendChild(a);
+      frag.appendChild(card);
     }
 
     grid.appendChild(frag);
-    state.rendered += next.length;
-    setLoadMoreVisible(list.length);
-    updateCountUI(list.length);
+    updateCountUI(total, page);
+
+    grid.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderPagination(totalItems) {
+    if (!paginationContainer) return;
+    const total = totalItems || 0;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    if (totalPages <= 1) {
+      paginationContainer.innerHTML = "";
+      return;
+    }
+
+    const current = state.currentPage || 1;
+    const btn = (label, page, disabled = false, extraClass = "") =>
+      `<button type="button" class="${extraClass}" data-page="${page}"${
+        disabled ? " disabled" : ""
+      }>${label}</button>`;
+
+    const parts = [];
+
+    // Prev
+    parts.push(
+      btn(
+        "Prev",
+        Math.max(1, current - 1),
+        current === 1,
+        "pagination-prev",
+      ),
+    );
+
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let p = 1; p <= totalPages; p++) pages.push(p);
+    } else {
+      if (current <= 4) {
+        pages.push(1, 2, 3, 4, 5, "...", totalPages);
+      } else if (current >= totalPages - 3) {
+        pages.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", current - 1, current, current + 1, "...", totalPages);
+      }
+    }
+
+    pages.forEach((p) => {
+      if (p === "...") {
+        parts.push('<span class="ellipsis">…</span>');
+      } else {
+        const isActive = p === current;
+        parts.push(
+          btn(
+            String(p),
+            p,
+            false,
+            `pagination-page${isActive ? " active" : ""}`,
+          ),
+        );
+      }
+    });
+
+    // Next
+    parts.push(
+      btn(
+        "Next",
+        Math.min(totalPages, current + 1),
+        current === totalPages,
+        "pagination-next",
+      ),
+    );
+
+    paginationContainer.innerHTML = `<div class="pagination">${parts.join("")}</div>`;
+
+    paginationContainer.querySelectorAll("button[data-page]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const page = parseInt(el.getAttribute("data-page") || "1", 10);
+        if (!Number.isFinite(page)) return;
+        renderPage(page);
+        renderPagination(total);
+      });
+    });
   }
 
   // Exposed callback — products.js calls this when Firestore data arrives/updates
   window.renderProducts = () => {
     const list = computeFiltered();
-    clearAndPrime(list);
+    state.currentList = list;
+    state.currentPage = 1;
+    renderPage(1);
+    renderPagination(list.length);
   };
 
   // -----------------------------
@@ -261,18 +352,6 @@
         state.sort = sortSelect.value === "oldest" ? "oldest" : "recent";
         window.renderProducts();
       });
-    }
-
-    if (loadMoreBtn) {
-      loadMoreBtn.addEventListener("click", appendNextChunk);
-    }
-
-    // Infinite scroll sentinel (optional enhancement)
-    if (sentinel && "IntersectionObserver" in window) {
-      const io = new IntersectionObserver((entries) => {
-        if (entries.some(e => e.isIntersecting)) appendNextChunk();
-      }, { rootMargin: "600px 0px" });
-      io.observe(sentinel);
     }
   }
 
