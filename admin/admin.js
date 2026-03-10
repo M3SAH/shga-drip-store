@@ -431,17 +431,18 @@ async function handleAdd() {
   const cat   = val("a-cat");
   const stock = parseInt(val("a-stock"))   || 0;
   let grades   = getChecked("a-grades");
-  const sizes    = getChecked("a-sizes");
+  const isCaps = cat === "Caps";
+  const sizes    = isCaps ? [] : getChecked("a-sizes");
   const colors   = getChecked("a-colors");
   const imageUrl = val("a-image-url").trim();
-  const hasSleeveless = document.getElementById("a-sleeveless")?.checked || false;
+  const hasSleeveless = isCaps ? false : (document.getElementById("a-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("a-featured")?.checked || false;
 
   const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
 
   if (!name)           return toast("Product name is required.", "error");
   if (!cat)            return toast("Please select a category.", "error");
-  if (!sizes.length)   return toast("Please select at least one size.", "error");
+  if (!isCaps && !sizes.length)   return toast("Please select at least one size.", "error");
   if (!colors.length)  return toast("Please select at least one color.", "error");
   if (!imageUrl)       return toast("Please upload a product image using the Upload Image button.", "error");
   if (!isCloudinaryUrl(imageUrl)) {
@@ -579,11 +580,13 @@ function openEditModal(docId) {
     if (v === "XXXL") return "3XL";
     return v;
   });
-  document.querySelectorAll("#e-sizes .chip input[type=checkbox]").forEach(cb => {
-    cb.checked = normalizedSizes.includes(String(cb.value || "").toUpperCase().trim());
-    cb.closest(".chip").classList.toggle("checked", cb.checked);
-  });
-  syncAllChip("e-sizes");
+  if ((p.category || "") !== "Caps") {
+    document.querySelectorAll("#e-sizes .chip input[type=checkbox]").forEach(cb => {
+      cb.checked = normalizedSizes.includes(String(cb.value || "").toUpperCase().trim());
+      cb.closest(".chip").classList.toggle("checked", cb.checked);
+    });
+    syncAllChip("e-sizes");
+  }
 
   document.querySelectorAll("#e-colors .chip input[type=checkbox]").forEach(cb => {
     cb.checked = (p.colors || []).includes(cb.value);
@@ -594,7 +597,7 @@ function openEditModal(docId) {
   // Sleeveless
   const eSlv = document.getElementById("e-sleeveless");
   if (eSlv) {
-    eSlv.checked = p.hasSleeveless || false;
+    eSlv.checked = (p.category || "") === "Caps" ? false : (p.hasSleeveless || false);
     eSlv.closest(".chip").classList.toggle("checked", eSlv.checked);
   }
 
@@ -626,10 +629,11 @@ async function handleSaveEdit() {
   const cat   = val("e-cat");
   const stock = parseInt(val("e-stock"))   || 0;
   let grades   = getChecked("e-grades");
-  const sizes    = getChecked("e-sizes");
+  const isCaps = cat === "Caps";
+  const sizes    = isCaps ? [] : getChecked("e-sizes");
   const colors   = getChecked("e-colors");
   const newUrl   = val("e-image-url").trim();
-  const hasSleeveless = document.getElementById("e-sleeveless")?.checked || false;
+  const hasSleeveless = isCaps ? false : (document.getElementById("e-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("e-featured")?.checked || false;
 
   const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
@@ -654,7 +658,7 @@ async function handleSaveEdit() {
   }
 
   if (!name)          return toast("Product name is required.", "error");
-  if (!sizes.length)  return toast("Please select at least one size.", "error");
+  if (!isCaps && !sizes.length)  return toast("Please select at least one size.", "error");
   if (!colors.length) return toast("Please select at least one color.", "error");
   if (newUrl && !isCloudinaryUrl(newUrl)) {
     return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
@@ -957,6 +961,13 @@ function togglePricingUI(form) {
   if (fixedWrap) fixedWrap.style.display = useFixed ? "block" : "none";
   if (gradesWrap) gradesWrap.style.display = useFixed ? "none" : "block";
   if (gradePricesWrap) gradePricesWrap.style.display = useFixed ? "none" : "block";
+
+  // Caps: no sizes & no sleeve options
+  const isCaps = cat === "Caps";
+  const sizesWrap = document.getElementById(isAdd ? "a-sizes-wrap" : "e-sizes-wrap");
+  const sleevelessWrap = document.getElementById(isAdd ? "a-sleeveless-wrap" : "e-sleeveless-wrap");
+  if (sizesWrap) sizesWrap.style.display = isCaps ? "none" : "block";
+  if (sleevelessWrap) sleevelessWrap.style.display = isCaps ? "none" : "block";
 
   // Auto-fill fixed price for Caps/Hoodies (only if empty)
   if (useFixed) {

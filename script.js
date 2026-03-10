@@ -168,7 +168,7 @@ const buildSingleWaLink = (product, grade, color) => {
     : `Shirt Grade: ${grade.name} — ${formatPrice(grade.price)}`;
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
-  const sizeInfo   = state.selectedSize ? `Size: ${state.selectedSize.label}` : "";
+  const sizeInfo   = (product.category !== "Caps" && state.selectedSize) ? `Size: ${state.selectedSize.label}` : "";
   const msg =
     `Hi SHGAdrip! I'd like to order:\n\n` +
     `Design: ${product.name}\n${gradeInfo}\n${sleeveInfo}\n${sizeInfo}\n${colorInfo}\n\n` +
@@ -339,6 +339,14 @@ const renderSizeSelector = (product) => {
   const wrap = $("sizeSelector");
   if (!wrap) return;
 
+  const section = wrap.closest(".size-selector-section");
+  if (product.category === "Caps") {
+    if (section) section.style.display = "none";
+    state.selectedSize = null;
+    return;
+  }
+  if (section) section.style.display = "block";
+
   const normalize = (s) => {
     const v = String(s || "").toUpperCase().trim();
     if (v === "XXL") return "2XL";
@@ -386,7 +394,7 @@ const renderSleeveSelector = (product) => {
   const section = wrap.closest(".sleeve-selector-section");
 
   // Show sleeve selector if product has sleeveless option
-  const showSleeve = product.hasSleeveless || product.type === "sleeveless";
+  const showSleeve = product.category !== "Caps" && (product.hasSleeveless || product.type === "sleeveless");
 
   if (!showSleeve) {
     if (section) section.style.display = "none";

@@ -197,15 +197,21 @@
       if (product.type === "sleeveless") sleeveSelect.value = "sleeveless";
     }
 
-    // Size selector (includes 3XL)
-    const savedSizes = Array.isArray(product.sizes) && product.sizes.length
-      ? product.sizes.map(normalizeSize)
-      : CANON_SIZES;
-    const allowedSizes = CANON_SIZES.filter(s => savedSizes.includes(s));
-    const sizes = allowedSizes.length ? allowedSizes : CANON_SIZES;
-    if (sizeSelect) {
-      sizeSelect.disabled = false;
-      sizeSelect.innerHTML = sizes.map((s) => `<option value="${s}">${s}</option>`).join("");
+    // Size selector (Caps: hide; others: show)
+    const sizeWrap = sizeSelect && sizeSelect.closest(".product-select");
+    if (product.category === "Caps") {
+      if (sizeWrap) sizeWrap.style.display = "none";
+    } else {
+      if (sizeWrap) sizeWrap.style.display = "";
+      const savedSizes = Array.isArray(product.sizes) && product.sizes.length
+        ? product.sizes.map(normalizeSize)
+        : CANON_SIZES;
+      const allowedSizes = CANON_SIZES.filter(s => savedSizes.includes(s));
+      const sizes = allowedSizes.length ? allowedSizes : CANON_SIZES;
+      if (sizeSelect) {
+        sizeSelect.disabled = false;
+        sizeSelect.innerHTML = sizes.map((s) => `<option value="${s}">${s}</option>`).join("");
+      }
     }
 
     // Color selector
@@ -220,7 +226,7 @@
     function updatePriceAndLink() {
       const sleeve = sleeveSelect ? sleeveSelect.value : "sleeved";
       const sleeveName = sleeve === "sleeveless" ? "Sleeveless" : "With Sleeves";
-      const sizeVal = sizeSelect ? sizeSelect.value : "";
+      const sizeVal = (product.category === "Caps") ? "" : (sizeSelect ? sizeSelect.value : "");
       const colorVal = colorSelect ? colorSelect.value : "";
 
       let selectedGrade = null;
@@ -240,10 +246,11 @@
       }
 
       if (waBtn) {
+        const sleeveForWa = (product.category === "Caps") ? "" : (showSleeves ? sleeveName : "");
         waBtn.href = buildWaLink({
           product,
           grade: selectedGrade,
-          sleeve: showSleeves ? sleeveName : "",
+          sleeve: sleeveForWa,
           size: sizeVal,
           color: colorVal,
         });
