@@ -7,6 +7,26 @@
       name="description"
       content="SHGAdrip Collections – Luxury in Every Drip. Browse all products."
     />
+    <meta name="keywords" content="SHGAdrip, streetwear, collections, t-shirts, hoodies, caps, Abuja, Nigeria" />
+    <link rel="canonical" href="https://shgadrip.com/collections/" />
+    <!-- Open Graph / Social -->
+    <meta property="og:title" content="SHGAdrip Collections" />
+    <meta property="og:description" content="Browse all SHGAdrip products — premium t-shirts, hoodies, sleeveless designs and caps." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://shgadrip.com/collections/" />
+    <meta property="og:image" content="https://shgadrip.com/assets/img/og-image.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SHGAdrip Collections" />
+    <meta name="twitter:description" content="Browse all SHGAdrip products — premium t-shirts, hoodies, sleeveless designs and caps." />
+    <meta name="twitter:image" content="https://shgadrip.com/assets/img/og-image.jpg" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": "SHGAdrip Collections",
+      "url": "https://shgadrip.com/collections/"
+    }
+    </script>
     <title>Collections | SHGAdrip</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -47,6 +67,12 @@
                 <i class="fa-brands fa-whatsapp"></i> WhatsApp
               </a>
             </div>
+          </div>
+          <div class="nav-actions">
+            <button class="cart-icon-btn" id="cartBtn" aria-label="Open cart">
+              <i class="fa-solid fa-bag-shopping"></i>
+              <span class="cart-count" id="cartCount" style="display:none">0</span>
+            </button>
           </div>
           <div class="nav-overlay" id="navOverlay"></div>
         </nav>
@@ -164,5 +190,30 @@
 
     <script type="module" src="../js/products.js"></script>
     <script src="../js/collections-page.js"></script>
+    <script src="../js/cart.js"></script>
+
+    <!-- Cart panel -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <aside class="cart-panel" id="cartPanel" aria-label="Shopping cart">
+      <div class="cart-panel-header">
+        <p class="cart-panel-title"><i class="fa-solid fa-bag-shopping"></i> Cart</p>
+        <button class="cart-close-btn" id="cartClose" aria-label="Close cart">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="cart-items-list" id="cartItems"></div>
+      <p class="cart-empty" id="cartEmptyMsg">
+        Your cart is empty.<br><span>Browse the collection and add items.</span>
+      </p>
+      <div class="cart-panel-footer">
+        <div class="cart-total-row">
+          <span>Total</span>
+          <span id="cartTotal">₦0</span>
+        </div>
+        <a id="cartWaBtn" class="btn btn-wa" style="display:none;text-align:center;">
+          <i class="fa-brands fa-whatsapp"></i> Order via WhatsApp
+        </a>
+      </div>
+    </aside>
   </body>
 </html>

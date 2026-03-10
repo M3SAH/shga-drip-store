@@ -182,6 +182,15 @@
             <span class="card-cta">${outOfStock ? "View details" : "View Product"}</span>
           </div>
         </a>
+        ${!outOfStock ? `
+        <button
+          class="card-add-to-cart-btn"
+          data-product-id="${product.id}"
+          aria-label="Add ${product.name} to cart"
+          title="Add to cart"
+        >
+          <i class="fa-solid fa-cart-plus"></i>
+        </button>` : ""}
       `;
 
       frag.appendChild(card);
@@ -285,6 +294,68 @@
   // Events
   // -----------------------------
   function initEvents() {
+    // ── Add-to-cart: delegated click on the product grid ──
+    if (grid) {
+      grid.addEventListener("click", (e) => {
+        const btn = e.target.closest(".card-add-to-cart-btn");
+        if (!btn || !window.SHGACart) return;
+        e.preventDefault();
+
+        const productId = btn.dataset.productId;
+        const source    = window.products || [];
+        const product   = source.find(p => String(p.id) === String(productId));
+        if (!product) return;
+
+        const DEFAULT_GRADES_LOCAL = [
+          { name: "Standard Pro 250 GSM", price: 16000 },
+          { name: "New Premium 320 GSM",  price: 22000 },
+          { name: "Prime 350 GSM",        price: 28000 },
+          { name: "Stone Wash 370 GSM",   price: 30000 },
+        ];
+        const isCap        = product.category === "Caps";
+        const isHoodie     = product.category === "Hoodies";
+        const isSleeveless = product.type === "sleeveless" || product.category === "Sleeveless";
+
+        let grade = null;
+        let price = 0;
+        if (isCap)          { price = Number(product.price) || 10000; }
+        else if (isHoodie)  { price = Number(product.price) || 30000; }
+        else if (isSleeveless){ price = Number(product.price) || 0; }
+        else {
+          const enabledNames = Array.isArray(product.grades) && product.grades.length
+            ? product.grades : DEFAULT_GRADES_LOCAL.map(g => g.name);
+          const gradePrices  = product.gradePrices || {};
+          const firstGrade   = DEFAULT_GRADES_LOCAL.find(g => enabledNames.includes(g.name));
+          grade = firstGrade
+            ? { name: firstGrade.name, price: gradePrices[firstGrade.name] ? Number(gradePrices[firstGrade.name]) : firstGrade.price }
+            : DEFAULT_GRADES_LOCAL[0];
+          price = grade.price;
+        }
+
+        const defaultSize  = (Array.isArray(product.sizes)  && product.sizes.length)  ? product.sizes[0]  : "L";
+        const defaultColor = (Array.isArray(product.colors) && product.colors.length) ? product.colors[0] : "White";
+
+        window.SHGACart.add({
+          productId:  product.id,
+          design:     product.name,
+          imageUrl:   product.imageUrl || product.image || "",
+          shirtGrade: grade ? grade.name : null,
+          price,
+          size:        isCap ? null : defaultSize,
+          sleeveStyle: isSleeveless ? "Sleeveless" : "With Sleeves",
+          color:       defaultColor,
+        });
+
+        // Visual feedback on button
+        btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
+        btn.classList.add("added");
+        setTimeout(() => {
+          btn.innerHTML = `<i class="fa-solid fa-cart-plus"></i>`;
+          btn.classList.remove("added");
+        }, 1400);
+      });
+    }
+
     // Mobile nav (shared behavior)
     const navToggle = $("navToggle");
     const navMenu = $("navMenu");

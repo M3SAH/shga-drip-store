@@ -255,6 +255,23 @@
           color: colorVal,
         });
       }
+
+      // Wire add-to-cart button on this page
+      const addToCartBtn = $("productAddToCart");
+      if (addToCartBtn && window.SHGACart) {
+        addToCartBtn.onclick = () => {
+          window.SHGACart.add({
+            productId:  product.id,
+            design:     product.name,
+            imageUrl:   product.imageUrl || product.image || "",
+            shirtGrade: selectedGrade ? selectedGrade.name : null,
+            price:      priceVal,
+            size:       sizeVal || null,
+            sleeveStyle: (product.category === "Caps") ? null : sleeveName,
+            color:      colorVal || null,
+          });
+        };
+      }
     }
 
     [gradeSelect, sleeveSelect, sizeSelect, colorSelect].forEach((el) => {
