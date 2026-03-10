@@ -940,6 +940,10 @@ function initReviewsUpload() {
    CATEGORY TOGGLE — show shirt grades vs fixed price (Caps/Hoodies)
 ══════════════════════════════════════════════ */
 const FIXED_PRICE_CATS = ["Caps", "Hoodies"];
+const FIXED_PRICE_BY_CAT = {
+  Caps: 10000,
+  Hoodies: 30000,
+};
 
 function togglePricingUI(form) {
   const isAdd = form === "add";
@@ -953,6 +957,14 @@ function togglePricingUI(form) {
   if (fixedWrap) fixedWrap.style.display = useFixed ? "block" : "none";
   if (gradesWrap) gradesWrap.style.display = useFixed ? "none" : "block";
   if (gradePricesWrap) gradePricesWrap.style.display = useFixed ? "none" : "block";
+
+  // Auto-fill fixed price for Caps/Hoodies (only if empty)
+  if (useFixed) {
+    const fixedInput = document.getElementById(isAdd ? "a-fixed-price" : "e-fixed-price");
+    if (fixedInput && !String(fixedInput.value || "").trim() && FIXED_PRICE_BY_CAT[cat]) {
+      fixedInput.value = String(FIXED_PRICE_BY_CAT[cat]);
+    }
+  }
 }
 
 function initAddFormCategoryToggle() {
