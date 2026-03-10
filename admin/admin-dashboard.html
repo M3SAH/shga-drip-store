@@ -1,0 +1,2592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SHGAdrip Admin — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <style>
+      /* ════════════════════════════════════════════
+       TOKENS
+    ════════════════════════════════════════════ */
+      :root {
+        --gold: #c9a84c;
+        --gold-light: #e2c06a;
+        --gold-dim: rgba(201, 168, 76, 0.12);
+        --gold-glow: rgba(201, 168, 76, 0.25);
+        --black: #080808;
+        --bg: #0d0d0d;
+        --surface: #111111;
+        --surface2: #171717;
+        --surface3: #1e1e1e;
+        --border: #222222;
+        --border2: #2c2c2c;
+        --text: #f0f0f0;
+        --muted: #7a7a7a;
+        --dim: #444444;
+        --success: #4dbf7f;
+        --success-bg: rgba(77, 191, 127, 0.1);
+        --success-bdr: rgba(77, 191, 127, 0.25);
+        --warning: #e09b3a;
+        --warning-bg: rgba(224, 155, 58, 0.1);
+        --warning-bdr: rgba(224, 155, 58, 0.25);
+        --danger: #e05555;
+        --danger-bg: rgba(224, 85, 85, 0.1);
+        --danger-bdr: rgba(224, 85, 85, 0.25);
+        --sidebar-w: 248px;
+        --topbar-h: 60px;
+        --radius: 3px;
+        --transition: 0.18s ease;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        overflow-x: hidden;
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+
+      /* ════════════════════════════════════════════
+       LAYOUT — mobile first: full-width main, sidebar drawer
+    ════════════════════════════════════════════ */
+      .layout {
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ════════════════════════════════════════════
+       SIDEBAR — off-canvas on mobile, visible on desktop
+    ════════════════════════════════════════════ */
+      .sidebar {
+        width: min(var(--sidebar-w), 85vw);
+        max-width: 280px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        position: fixed;
+        inset: 0 auto 0 0;
+        display: flex;
+        flex-direction: column;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .main {
+        margin-left: 0;
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      .sidebar-header {
+        padding: 1.6rem 1.5rem 1.2rem;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .wordmark {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 2rem;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .wordmark span {
+        color: var(--gold);
+      }
+
+      .admin-pill {
+        display: inline-block;
+        background: var(--gold-dim);
+        color: var(--gold);
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        padding: 0.22rem 0.55rem;
+        border-radius: 2px;
+        margin-top: 0.4rem;
+        border: 1px solid rgba(201, 168, 76, 0.2);
+      }
+
+      .sidebar-nav {
+        flex: 1;
+        padding: 1.25rem 0;
+        overflow-y: auto;
+      }
+
+      .nav-section {
+        font-size: 0.58rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--dim);
+        padding: 0.75rem 1.5rem 0.4rem;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.72rem 1.5rem;
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        border-left: 2px solid transparent;
+        transition:
+          color var(--transition),
+          background var(--transition),
+          border-color var(--transition);
+        user-select: none;
+      }
+
+      .nav-item i {
+        width: 16px;
+        text-align: center;
+        font-size: 0.82rem;
+        flex-shrink: 0;
+      }
+      .nav-item:hover {
+        color: var(--text);
+        background: var(--surface2);
+      }
+
+      .nav-item.active {
+        color: var(--gold);
+        background: var(--gold-dim);
+        border-left-color: var(--gold);
+      }
+
+      .sidebar-footer {
+        padding: 1.1rem 1.5rem;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .admin-user {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 0.8rem;
+      }
+
+      .avatar {
+        width: 30px;
+        height: 30px;
+        background: var(--gold-dim);
+        border: 1px solid rgba(201, 168, 76, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--gold);
+        font-size: 0.7rem;
+        flex-shrink: 0;
+      }
+
+      .admin-email {
+        font-size: 0.75rem;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .btn-logout {
+        width: 100%;
+        background: none;
+        border: 1px solid var(--border2);
+        color: var(--muted);
+        padding: 0.55rem 1rem;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        transition:
+          border-color var(--transition),
+          color var(--transition);
+      }
+
+      .btn-logout:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      /* Sidebar overlay (mobile) */
+      .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        z-index: 99;
+        backdrop-filter: blur(2px);
+      }
+
+      .sidebar-overlay.active {
+        display: block;
+      }
+
+      /* ════════════════════════════════════════════
+       MAIN CONTENT
+    ════════════════════════════════════════════ */
+
+      /* ── Topbar ── */
+      .topbar {
+        height: var(--topbar-h);
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .hamburger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.25rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        min-width: 44px;
+        min-height: 44px;
+        transition: color var(--transition);
+      }
+
+      .hamburger:hover {
+        color: var(--text);
+      }
+
+      .topbar-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .topbar-crumb {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .topbar-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 0.35rem 0.75rem;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .online-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--success);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* ── Content ── */
+      .content {
+        flex: 1;
+        padding: 1.75rem;
+      }
+
+      /* ════════════════════════════════════════════
+       VIEWS
+    ════════════════════════════════════════════ */
+      .view {
+        display: none;
+      }
+      .view.active {
+        display: block;
+        animation: fadeIn 0.22s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* ════════════════════════════════════════════
+       STAT CARDS
+    ════════════════════════════════════════════ */
+      .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+      }
+
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem 1.4rem;
+        position: relative;
+        overflow: hidden;
+        transition: border-color var(--transition);
+      }
+
+      .stat-card::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+      }
+
+      .stat-card.gold::after {
+        background: var(--gold);
+      }
+      .stat-card.green::after {
+        background: var(--success);
+      }
+      .stat-card.red::after {
+        background: var(--danger);
+      }
+      .stat-card.orange::after {
+        background: var(--warning);
+      }
+
+      .stat-card:hover {
+        border-color: var(--border2);
+      }
+
+      .stat-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        margin-bottom: 0.85rem;
+      }
+
+      .stat-card.gold .stat-icon {
+        background: var(--gold-dim);
+        color: var(--gold);
+      }
+      .stat-card.green .stat-icon {
+        background: var(--success-bg);
+        color: var(--success);
+      }
+      .stat-card.red .stat-icon {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
+      .stat-card.orange .stat-icon {
+        background: var(--warning-bg);
+        color: var(--warning);
+      }
+
+      .stat-val {
+        font-size: 2.2rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .stat-lbl {
+        font-size: 0.67rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-top: 0.25rem;
+      }
+
+      /* loading shimmer */
+      .shimmer {
+        background: linear-gradient(
+          90deg,
+          var(--surface2) 25%,
+          var(--surface3) 50%,
+          var(--surface2) 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+        border-radius: var(--radius);
+      }
+
+      @keyframes shimmer {
+        to {
+          background-position: -200% 0;
+        }
+      }
+
+      /* ════════════════════════════════════════════
+       SECTION HEADER
+    ════════════════════════════════════════════ */
+      .section-hdr {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .section-title {
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .section-sub {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.15rem;
+      }
+
+      /* ════════════════════════════════════════════
+       BUTTONS
+    ════════════════════════════════════════════ */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border-radius: var(--radius);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        cursor: pointer;
+        border: none;
+        transition: all var(--transition);
+        white-space: nowrap;
+      }
+
+      .btn-md {
+        padding: 0.6rem 1.2rem;
+      }
+      .btn-sm {
+        padding: 0.38rem 0.75rem;
+        font-size: 0.68rem;
+      }
+      .btn-full {
+        width: 100%;
+      }
+
+      .btn-gold {
+        background: var(--gold);
+        color: #000;
+      }
+      .btn-gold:hover {
+        background: var(--gold-light);
+        box-shadow: 0 4px 14px var(--gold-glow);
+      }
+      .spin {
+        display: inline-block;
+        width: 13px;
+        height: 13px;
+        border: 2px solid rgba(0, 0, 0, 0.3);
+        border-top-color: #000;
+        border-radius: 50%;
+        animation: spin 0.55s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .btn-ghost {
+        background: none;
+        border: 1px solid var(--border2);
+        color: var(--muted);
+      }
+      .btn-ghost:hover {
+        border-color: var(--muted);
+        color: var(--text);
+      }
+
+      .btn-danger-outline {
+        background: none;
+        border: 1px solid var(--danger-bdr);
+        color: var(--danger);
+      }
+      .btn-danger-outline:hover {
+        background: var(--danger);
+        color: #fff;
+        border-color: var(--danger);
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+
+      /* ════════════════════════════════════════════
+       TOOLBAR (search + filter)
+    ════════════════════════════════════════════ */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        padding: 0.9rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface2);
+      }
+
+      .search-box {
+        position: relative;
+        flex: 1;
+        min-width: 180px;
+        max-width: 300px;
+      }
+
+      .search-box i {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--dim);
+        font-size: 0.78rem;
+        pointer-events: none;
+      }
+
+      .search-box input {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 0.55rem 0.9rem 0.55rem 2.2rem;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .search-box input:focus {
+        border-color: var(--gold);
+      }
+      .search-box input::placeholder {
+        color: var(--dim);
+      }
+
+      .filter-select {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 0.55rem 2rem 0.55rem 0.9rem;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.82rem;
+        outline: none;
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23666' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.6rem center;
+        transition: border-color 0.2s;
+      }
+
+      .filter-select:focus {
+        border-color: var(--gold);
+      }
+      .filter-select option {
+        background: var(--surface2);
+      }
+
+      .toolbar-right {
+        margin-left: auto;
+        font-size: 0.72rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      /* ════════════════════════════════════════════
+       PRODUCT TABLE
+    ════════════════════════════════════════════ */
+      .table-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+
+      .table-scroll {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      thead th {
+        background: var(--surface2);
+        padding: 0.7rem 1rem;
+        text-align: left;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background var(--transition);
+      }
+
+      tbody tr:last-child {
+        border-bottom: none;
+      }
+      tbody tr:hover {
+        background: var(--surface2);
+      }
+
+      td {
+        padding: 0.9rem 1rem;
+        vertical-align: middle;
+      }
+
+      .thumb {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: var(--radius);
+        border: 1px solid var(--border2);
+        background: var(--surface2);
+        display: block;
+      }
+
+      .thumb-placeholder {
+        width: 50px;
+        height: 50px;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--dim);
+        font-size: 1rem;
+      }
+
+      .prod-name {
+        font-weight: 600;
+        color: var(--text);
+        max-width: 200px;
+      }
+      .prod-cat {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.15rem;
+      }
+      .price-cell {
+        font-weight: 700;
+        color: var(--gold);
+        white-space: nowrap;
+      }
+
+      /* Status badges */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.24rem 0.55rem;
+        border-radius: 2px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .badge.in-stock {
+        background: var(--success-bg);
+        color: var(--success);
+        border: 1px solid var(--success-bdr);
+      }
+      .badge.low-stock {
+        background: var(--warning-bg);
+        color: var(--warning);
+        border: 1px solid var(--warning-bdr);
+      }
+      .badge.out-stock {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border: 1px solid var(--danger-bdr);
+      }
+
+      .tag-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        max-width: 140px;
+      }
+
+      .tag {
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        color: var(--muted);
+        font-size: 0.62rem;
+        font-weight: 600;
+        padding: 0.18rem 0.42rem;
+        border-radius: 2px;
+      }
+
+      .action-cell {
+        display: flex;
+        gap: 0.45rem;
+        align-items: center;
+      }
+
+      /* ════════════════════════════════════════════
+       EMPTY / LOADING STATES
+    ════════════════════════════════════════════ */
+      .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+      }
+
+      .empty-icon {
+        font-size: 2.5rem;
+        color: var(--dim);
+        margin-bottom: 0.85rem;
+      }
+      .empty-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .empty-sub {
+        font-size: 0.82rem;
+        color: var(--dim);
+        margin-top: 0.35rem;
+      }
+
+      .loading-state {
+        padding: 3rem 2rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        border: 2px solid var(--border2);
+        border-top-color: var(--gold);
+        border-radius: 50%;
+        animation: spin 0.65s linear infinite;
+        margin-bottom: 0.65rem;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ════════════════════════════════════════════
+       PAGINATION
+    ════════════════════════════════════════════ */
+      .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 0.85rem 1.25rem;
+        border-top: 1px solid var(--border);
+        background: var(--surface2);
+      }
+
+      .page-info {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .page-btns {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .page-btn {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        color: var(--muted);
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.78rem;
+        font-family: "DM Sans", sans-serif;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition);
+      }
+
+      .page-btn:hover {
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+      .page-btn.active {
+        background: var(--gold);
+        border-color: var(--gold);
+        color: #000;
+      }
+      .page-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      /* ════════════════════════════════════════════
+       FORMS
+    ════════════════════════════════════════════ */
+      .form-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2rem;
+        max-width: 740px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.15rem;
+      }
+
+      .fg {
+        display: flex;
+        flex-direction: column;
+        gap: 0.38rem;
+      }
+      .fg.span2 {
+        grid-column: 1/-1;
+      }
+
+      .fg label {
+        font-size: 0.63rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .fg input,
+      .fg textarea,
+      .fg select {
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 0.72rem 0.95rem;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        outline: none;
+        width: 100%;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .fg input:focus,
+      .fg textarea:focus,
+      .fg select:focus {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 3px var(--gold-dim);
+      }
+
+      .fg textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .fg select option {
+        background: var(--surface2);
+      }
+      .fg input::placeholder,
+      .fg textarea::placeholder {
+        color: var(--dim);
+      }
+
+      /* Check chips */
+      .chip-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.2rem;
+      }
+
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        padding: 0.38rem 0.75rem;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--muted);
+        transition: all var(--transition);
+        user-select: none;
+      }
+
+      .chip input[type="checkbox"] {
+        display: none;
+      }
+      .chip:hover {
+        color: var(--text);
+        border-color: var(--border2);
+      }
+      .chip.checked {
+        background: var(--gold-dim);
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+
+      /* ── Per-grade price grid ── */
+      .grade-price-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 0.75rem;
+        margin-top: 0.2rem;
+      }
+      .grade-price-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .grade-price-item label {
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+      .grade-price-item input {
+        background: var(--surface2);
+        border: 1px solid var(--gold);
+        border-radius: var(--radius);
+        padding: 0.65rem 0.9rem;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.9rem;
+        outline: none;
+        width: 100%;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .grade-price-item input:focus {
+        box-shadow: 0 0 0 3px var(--gold-dim);
+      }
+      .grade-price-item input::placeholder {
+        color: var(--dim);
+      }
+
+      /* "All" chip — slightly distinct so it reads as a control */
+      .chip.chip-all {
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        border-style: dashed;
+      }
+      .chip.chip-all.checked {
+        background: var(--gold-dim);
+        border-color: var(--gold);
+        border-style: solid;
+        color: var(--gold);
+      }
+
+      /* ════════════════════════════════════════════
+       IMAGE UPLOADER
+    ════════════════════════════════════════════ */
+      .uploader {
+        border: 2px dashed var(--border2);
+        border-radius: var(--radius);
+        padding: 2rem 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        position: relative;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        overflow: hidden;
+      }
+
+      .uploader:hover,
+      .uploader.over {
+        border-color: var(--gold);
+        background: var(--gold-dim);
+      }
+
+      .uploader input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+
+      .uploader-icon {
+        font-size: 2rem;
+        color: var(--dim);
+        margin-bottom: 0.6rem;
+      }
+      .uploader-text {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .uploader-hint {
+        font-size: 0.7rem;
+        color: var(--dim);
+        margin-top: 0.2rem;
+      }
+
+      /* Preview */
+      .preview-wrap {
+        position: relative;
+        display: inline-block;
+        margin-top: 1rem;
+      }
+
+      .preview-img {
+        max-width: 200px;
+        max-height: 180px;
+        object-fit: cover;
+        border-radius: var(--radius);
+        border: 1px solid var(--border2);
+        display: block;
+      }
+
+      .preview-remove {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 22px;
+        height: 22px;
+        background: var(--danger);
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        color: #fff;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background var(--transition);
+      }
+
+      .preview-remove:hover {
+        background: #c03;
+      }
+
+      /* Progress */
+      .progress-wrap {
+        margin-top: 0.75rem;
+        display: none;
+      }
+
+      .progress-track {
+        height: 4px;
+        background: var(--border2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--gold), var(--gold-light));
+        width: 0%;
+        transition: width 0.25s;
+        border-radius: 2px;
+      }
+
+      .progress-lbl {
+        font-size: 0.7rem;
+        color: var(--muted);
+        margin-top: 0.3rem;
+      }
+
+      /* ════════════════════════════════════════════
+       MODALS
+    ════════════════════════════════════════════ */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.82);
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(5px);
+      }
+
+      .overlay.open {
+        display: flex;
+      }
+
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 700px;
+        max-height: 92vh;
+        display: flex;
+        flex-direction: column;
+        animation: modalIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+        box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+      }
+
+      @keyframes modalIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      .modal-hdr {
+        padding: 1.35rem 1.6rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .modal-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+
+      .modal-x {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 1.05rem;
+        padding: 0.25rem;
+        transition: color var(--transition);
+      }
+
+      .modal-x:hover {
+        color: var(--text);
+      }
+
+      .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.6rem;
+      }
+
+      .modal-ftr {
+        padding: 1.1rem 1.6rem;
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 0.65rem;
+        justify-content: flex-end;
+        flex-shrink: 0;
+      }
+
+      /* Confirm dialog */
+      .confirm-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2.25rem 2rem;
+        max-width: 380px;
+        text-align: center;
+        animation: modalIn 0.2s ease;
+        box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7);
+      }
+
+      .confirm-icon {
+        font-size: 2.8rem;
+        color: var(--danger);
+        margin-bottom: 0.85rem;
+      }
+      .confirm-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.45rem;
+      }
+      .confirm-body {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.55;
+        margin-bottom: 1.5rem;
+      }
+      .confirm-btns {
+        display: flex;
+        gap: 0.6rem;
+        justify-content: center;
+      }
+
+      /* ════════════════════════════════════════════
+       TOAST NOTIFICATIONS
+    ════════════════════════════════════════════ */
+      #toasts {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        z-index: 999;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 0.5rem;
+      }
+
+      .toast {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-left-width: 3px;
+        padding: 0.8rem 1.15rem;
+        border-radius: var(--radius);
+        font-size: 0.84rem;
+        min-width: 240px;
+        max-width: 340px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+        animation: toastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      .toast.success {
+        border-left-color: var(--success);
+      }
+      .toast.success .toast-icon {
+        color: var(--success);
+      }
+      .toast.error {
+        border-left-color: var(--danger);
+      }
+      .toast.error .toast-icon {
+        color: var(--danger);
+      }
+      .toast.warning {
+        border-left-color: var(--warning);
+      }
+      .toast.warning .toast-icon {
+        color: var(--warning);
+      }
+      .toast.info {
+        border-left-color: var(--gold);
+      }
+      .toast.info .toast-icon {
+        color: var(--gold);
+      }
+
+      .toast-icon {
+        flex-shrink: 0;
+        font-size: 0.85rem;
+      }
+
+      .toast.out {
+        animation: toastOut 0.25s ease forwards;
+      }
+
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateX(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes toastOut {
+        to {
+          opacity: 0;
+          transform: translateX(24px);
+        }
+      }
+
+      /* ════════════════════════════════════════════
+       RESPONSIVE — mobile first, then desktop
+    ════════════════════════════════════════════ */
+      /* Base (mobile): topbar/content padding, form single col */
+      .topbar {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+      }
+      .content {
+        padding: 0.85rem;
+        padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .fg.span2 {
+        grid-column: 1;
+      }
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      .form-card {
+        padding: 1.25rem;
+      }
+      .btn {
+        min-height: 44px;
+      }
+      .chip-group {
+        gap: 0.4rem;
+      }
+      .chip {
+        min-height: 44px;
+        padding: 0.5rem 0.75rem;
+      }
+
+      /* ════════════════════════════════════════════
+       MOBILE RESPONSIVENESS
+      ════════════════════════════════════════════ */
+      
+      @media (max-width: 600px) {
+        /* Topbar adjustments */
+        .topbar {
+          padding: 0 1rem;
+          height: 50px;
+        }
+        
+        .topbar-title {
+          font-size: 0.9rem;
+        }
+        
+        .topbar-crumb {
+          font-size: 0.7rem;
+        }
+        
+        .topbar-badge {
+          font-size: 0.65rem;
+          padding: 0.25rem 0.5rem;
+        }
+
+        /* Content padding */
+        .content {
+          padding: 1rem 0.75rem;
+        }
+
+        /* Stats cards - stack on mobile */
+        .stats-row {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+        }
+        
+        .stat-card {
+          padding: 1rem;
+        }
+        
+        .stat-val {
+          font-size: 1.8rem;
+        }
+
+        /* Section headers */
+        .section-hdr {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        
+        .section-title {
+          font-size: 0.9rem;
+        }
+
+        /* Toolbar - stack search and filter */
+        .toolbar {
+          flex-direction: column;
+          gap: 0.75rem;
+          padding: 0.75rem;
+        }
+        
+        .search-box {
+          width: 100%;
+          max-width: none;
+        }
+        
+        .filter-select {
+          width: 100%;
+        }
+        
+        .toolbar-right {
+          margin-left: 0;
+          text-align: center;
+        }
+
+        /* Table - make it scrollable horizontally */
+        .table-scroll {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Reduce table padding on mobile */
+        thead th {
+          padding: 0.5rem 0.5rem;
+          font-size: 0.55rem;
+        }
+        
+        td {
+          padding: 0.5rem;
+        }
+        
+        .thumb {
+          width: 40px;
+          height: 40px;
+        }
+        
+        .prod-name {
+          font-size: 0.85rem;
+          max-width: 120px;
+        }
+        
+        .prod-cat {
+          font-size: 0.65rem;
+        }
+        
+        .price-cell {
+          font-size: 0.8rem;
+        }
+        
+        .badge {
+          font-size: 0.6rem;
+          padding: 0.2rem 0.4rem;
+        }
+        
+        /* Action buttons - smaller on mobile */
+        .action-cell {
+          flex-direction: column;
+          gap: 0.25rem;
+          align-items: stretch;
+        }
+        
+        .btn-sm {
+          font-size: 0.6rem;
+          padding: 0.4rem 0.6rem;
+        }
+
+        /* Forms - single column on mobile */
+        .form-grid {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+        }
+        
+        .form-card {
+          padding: 1.25rem;
+        }
+        
+        .fg label {
+          font-size: 0.7rem;
+        }
+        
+        .fg input,
+        .fg textarea,
+        .fg select {
+          padding: 0.6rem 0.75rem;
+          font-size: 0.9rem;
+        }
+
+        /* Chips - smaller on mobile */
+        .chip {
+          font-size: 0.7rem;
+          padding: 0.3rem 0.6rem;
+        }
+        
+        .chip-group {
+          gap: 0.3rem;
+        }
+
+        /* Grade price grid - single column */
+        .grade-price-grid {
+          grid-template-columns: 1fr;
+          gap: 0.5rem;
+        }
+
+        /* Pagination */
+        .pagination {
+          flex-direction: column;
+          gap: 0.75rem;
+          padding: 0.75rem;
+        }
+        
+        .page-btns {
+          justify-content: center;
+        }
+        
+        .page-btn {
+          width: 35px;
+          height: 35px;
+          font-size: 0.7rem;
+        }
+
+        /* Modals */
+        .modal {
+          margin: 1rem;
+          max-height: 95vh;
+        }
+        
+        .modal-hdr {
+          padding: 1rem 1.25rem;
+        }
+        
+        .modal-body {
+          padding: 1.25rem;
+        }
+        
+        .modal-ftr {
+          padding: 0.75rem 1.25rem;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .modal-title {
+          font-size: 0.9rem;
+        }
+
+        /* Confirm dialog */
+        .confirm-box {
+          padding: 1.5rem 1.25rem;
+          margin: 1rem;
+        }
+        
+        .confirm-title {
+          font-size: 0.95rem;
+        }
+        
+        .confirm-body {
+          font-size: 0.8rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        /* Extra small phones */
+        .content {
+          padding: 0.75rem 0.5rem;
+        }
+        
+        .stats-row {
+          gap: 0.5rem;
+        }
+        
+        .stat-card {
+          padding: 0.75rem;
+        }
+        
+        .stat-val {
+          font-size: 1.6rem;
+        }
+        
+        .toolbar {
+          padding: 0.5rem;
+        }
+        
+        .section-title {
+          font-size: 0.85rem;
+        }
+        
+        .form-card {
+          padding: 1rem;
+        }
+        
+        .modal {
+          margin: 0.5rem;
+        }
+        
+        .wordmark {
+          font-size: 1.5rem;
+        }
+        
+        .admin-pill {
+          font-size: 0.5rem;
+          padding: 0.18rem 0.4rem;
+        }
+      }
+
+      @media (min-width: 601px) {
+        .content {
+          padding: 1.1rem;
+        }
+        .form-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .fg.span2 {
+          grid-column: 1 / -1;
+        }
+        .stats-row {
+          gap: 1rem;
+        }
+        .form-card {
+          padding: 2rem;
+        }
+      }
+
+      @media (min-width: 901px) {
+        .sidebar {
+          width: var(--sidebar-w);
+          max-width: none;
+          transform: translateX(0);
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .main {
+          margin-left: var(--sidebar-w);
+        }
+        .hamburger {
+          display: none;
+        }
+        .topbar {
+          padding: 0 1.75rem;
+        }
+        .content {
+          padding: 1.75rem;
+        }
+      }
+
+      /* scrollbar */
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--surface);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--dim);
+      }
+
+      /* ── Reviews admin grid ── */
+      .admin-reviews-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1.25rem;
+      }
+
+      .admin-review-card {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .admin-review-img-wrap {
+        width: 100%;
+        aspect-ratio: 9 / 16;   /* portrait — matches phone screenshots */
+        overflow: hidden;
+        background: var(--surface3);
+      }
+
+      .admin-review-img-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.25s ease;
+      }
+      .admin-review-card:hover .admin-review-img-wrap img {
+        transform: scale(1.03);
+      }
+
+      .admin-review-caption {
+        font-size: 0.78rem;
+        color: var(--muted);
+        padding: 0.5rem 0.75rem 0;
+        line-height: 1.4;
+      }
+
+      .admin-review-card .review-del-btn {
+        margin: 0.75rem;
+        align-self: flex-start;
+      }
+
+      /* Gold save button (if not already defined) */
+      .btn-gold {
+        background: var(--gold);
+        color: #000;
+        border: none;
+        font-weight: 700;
+      }
+      .btn-gold:hover {
+        background: var(--gold-light);
+        box-shadow: 0 4px 16px rgba(201,168,76,0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Sidebar overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="layout">
+      <!-- ══ SIDEBAR ══════════════════════════════ -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="wordmark">SHGA<span>drip</span></div>
+          <div class="admin-pill">Admin Panel</div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">Main</div>
+
+          <a class="nav-item active" data-view="dashboard" href="#">
+            <i class="fa-solid fa-chart-pie"></i> Dashboard
+          </a>
+          <a class="nav-item" data-view="add" href="#">
+            <i class="fa-solid fa-circle-plus"></i> Add Product
+          </a>
+          <a class="nav-item" data-view="manage" href="#">
+            <i class="fa-solid fa-layer-group"></i> Manage Stock
+          </a>
+          <a class="nav-item" data-view="reviews" href="#">
+            <i class="fa-solid fa-images"></i> Reviews
+          </a>
+
+          <div class="nav-section">Store</div>
+          <a
+            class="nav-item"
+            href="../index.html"
+            target="_blank"
+            rel="noopener"
+          >
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> View Store
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="admin-user">
+            <div class="avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="admin-email" id="adminEmail">—</div>
+          </div>
+          <button class="btn-logout" id="logoutBtn">
+            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <!-- ══ MAIN ════════════════════════════════ -->
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+              <i class="fa-solid fa-bars"></i>
+            </button>
+            <div>
+              <div class="topbar-title" id="topTitle">Dashboard</div>
+              <div class="topbar-crumb" id="topCrumb">Overview</div>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <div class="topbar-badge">
+              <div class="online-dot"></div>
+              <span>Live</span>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <!-- ══ DASHBOARD VIEW ══════════════════ -->
+          <div class="view active" id="view-dashboard">
+            <div class="stats-row" id="statsRow">
+              <!-- rendered by JS -->
+              <div class="stat-card gold shimmer" style="height: 100px"></div>
+              <div class="stat-card gold shimmer" style="height: 100px"></div>
+              <div class="stat-card gold shimmer" style="height: 100px"></div>
+              <div class="stat-card gold shimmer" style="height: 100px"></div>
+            </div>
+
+            <div class="section-hdr">
+              <div>
+                <div class="section-title">Recent Products</div>
+                <div class="section-sub">Last 5 items added to the store</div>
+              </div>
+              <button class="btn btn-gold btn-md" data-goto="add">
+                <i class="fa-solid fa-plus"></i> Add Product
+              </button>
+            </div>
+
+            <div class="table-card" id="recentWrap">
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <br />Loading products…
+              </div>
+            </div>
+          </div>
+
+          <!-- ══ ADD PRODUCT VIEW ════════════════ -->
+          <div class="view" id="view-add">
+            <div class="section-hdr">
+              <div>
+                <div class="section-title">Add New Product</div>
+                <div class="section-sub">
+                  Fill out the form and upload an image
+                </div>
+              </div>
+            </div>
+
+            <div class="form-card">
+              <div class="form-grid">
+                <div class="fg span2">
+                  <label>Product Name *</label>
+                  <input
+                    type="text"
+                    id="a-name"
+                    placeholder="e.g. USA Hustle Graphic Tee"
+                  />
+                </div>
+
+                <div class="fg span2">
+                  <label>Description</label>
+                  <textarea
+                    id="a-desc"
+                    rows="3"
+                    placeholder="Describe the product…"
+                  ></textarea>
+                </div>
+
+                <div class="fg">
+                  <label>Category *</label>
+                  <select id="a-cat">
+                    <option value="">Select category…</option>
+                    <option value="Unisex">Unisex</option>
+                    <option value="Sleeveless">Sleeveless</option>
+                    <option value="Hoodies">Hoodies</option>
+                    <option value="Caps">Caps</option>
+                  </select>
+                </div>
+
+                <div class="fg span2">
+                  <label>Available Grades / Tiers</label>
+                  <div class="chip-group" id="a-grades">
+                    <label class="chip chip-all"
+                      ><input type="checkbox" value="__all__" /> All</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Standard Pro 250 GSM" />
+                      Standard Pro 250 GSM</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="New Premium 320 GSM" checked />
+                      New Premium 320 GSM</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Prime 350 GSM" /> Prime 350 GSM</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Stone Wash 370 GSM" /> Stone Wash 370 GSM</label
+                    >
+                  </div>
+                </div>
+
+                <!-- Per-grade price inputs (shown dynamically) -->
+                <div class="fg span2" id="a-grade-prices-wrap">
+                  <label>Price Per Grade (₦) *</label>
+                  <div id="a-grade-prices" class="grade-price-grid"></div>
+                  <small
+                    style="
+                      font-size: 0.72rem;
+                      color: var(--muted);
+                      margin-top: 0.25rem;
+                      display: block;
+                    "
+                  >
+                    Set a price for each selected grade. The lowest price will
+                    show as "Starts from" on the storefront.
+                  </small>
+                </div>
+
+                <!-- Sleeveless option -->
+                <div class="fg span2">
+                  <label>Sleeve Option</label>
+                  <label
+                    class="chip"
+                    id="a-sleeveless-chip"
+                    style="display: inline-flex; width: auto"
+                  >
+                    <input
+                      type="checkbox"
+                      id="a-sleeveless"
+                      value="sleeveless"
+                    />
+                    <i
+                      class="fa-solid fa-person-running"
+                      style="margin-right: 0.3rem"
+                    ></i>
+                    Has Sleeveless Version
+                  </label>
+                  <small
+                    style="
+                      font-size: 0.72rem;
+                      color: var(--muted);
+                      margin-top: 0.25rem;
+                      display: block;
+                    "
+                  >
+                    If checked, customers can choose between with-sleeves and
+                    sleeveless.
+                  </small>
+                </div>
+
+                <!-- Featured option -->
+                <div class="fg span2">
+                  <label>Featured Item</label>
+                  <label
+                    class="chip"
+                    id="a-featured-chip"
+                    style="display: inline-flex; width: auto"
+                  >
+                    <input
+                      type="checkbox"
+                      id="a-featured"
+                      value="featured"
+                    />
+                    <i
+                      class="fa-solid fa-star"
+                      style="margin-right: 0.3rem"
+                    ></i>
+                    Add to Featured Items
+                  </label>
+                  <small
+                    style="
+                      font-size: 0.72rem;
+                      color: var(--muted);
+                      margin-top: 0.25rem;
+                      display: block;
+                    "
+                  >
+                    Featured items appear on the homepage showcase section.
+                  </small>
+                </div>
+
+                <div class="fg">
+                  <label>Stock Quantity *</label>
+                  <input type="number" id="a-stock" placeholder="50" min="0" />
+                </div>
+
+                <div class="fg span2">
+                  <label>Available Sizes</label>
+                  <div class="chip-group" id="a-sizes">
+                    <label class="chip chip-all"
+                      ><input type="checkbox" value="__all__" /> All</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="M" checked /> M</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="L" checked /> L</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="XL" checked /> XL</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="2XL" checked /> 2XL</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="3XL" /> 3XL</label
+                    >
+                  </div>
+                </div>
+
+                <div class="fg span2">
+                  <label>Available Colors</label>
+                  <div class="chip-group" id="a-colors">
+                    <label class="chip chip-all"
+                      ><input type="checkbox" value="__all__" /> All</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="White" checked />
+                      White</label
+                    >
+                    <label class="chip checked"
+                      ><input type="checkbox" value="Black" checked />
+                      Black</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Red" /> Red</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Navy Blue" /> Navy Blue</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Royal Blue" /> Royal Blue</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Sky Blue" /> Sky Blue</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Yellow" /> Yellow</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Grey" /> Grey</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Green" /> Green</label
+                    >
+                    <label class="chip"
+                      ><input type="checkbox" value="Purple" /> Purple</label
+                    >
+                  </div>
+                </div>
+
+                <div class="fg span2">
+                  <label>Product Image (Cloudinary)</label>
+                  <div
+                    style="
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 0.5rem;
+                      align-items: center;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-gold btn-sm"
+                      id="a-upload-btn"
+                    >
+                      <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                    </button>
+                    <input
+                      type="url"
+                      id="a-image-url"
+                      placeholder="Image URL (auto-filled)"
+                      style="flex: 1; min-width: 180px; font-size: 0.8rem"
+                      readonly
+                    />
+                  </div>
+                  <small
+                    style="
+                      font-size: 0.75rem;
+                      color: var(--muted);
+                      margin-top: 0.15rem;
+                      display: block;
+                    "
+                  >
+                    Click <strong>Upload Image</strong> to upload directly to
+                    Cloudinary. The secure URL is stored automatically and saved
+                    with the product.
+                  </small>
+                  <div
+                    id="a-preview-wrap"
+                    style="display: none; margin-top: 0.75rem"
+                  >
+                    <div class="preview-wrap">
+                      <img
+                        class="preview-img"
+                        id="a-preview"
+                        src=""
+                        alt="Preview"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- /form-grid -->
+
+              <div style="margin-top: 1.6rem; display: flex; gap: 0.65rem">
+                <button class="btn btn-gold btn-md" id="addBtn">
+                  <i class="fa-solid fa-plus"></i> Add Product
+                </button>
+                <button class="btn btn-ghost btn-md" id="resetBtn">
+                  <i class="fa-solid fa-rotate-left"></i> Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══ MANAGE STOCK VIEW ═══════════ -->
+          <div class="view" id="view-manage">
+            <div class="section-hdr">
+              <div>
+                <div class="section-title">Manage Stock</div>
+                <div class="section-sub">Search, edit, or delete products</div>
+              </div>
+              <button class="btn btn-gold btn-md" data-goto="add">
+                <i class="fa-solid fa-plus"></i> Add Product
+              </button>
+            </div>
+
+            <div class="table-card">
+              <div class="toolbar">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="Search products…"
+                  />
+                </div>
+                <select class="filter-select" id="catFilter">
+                  <option value="">All Categories</option>
+                  <option value="Unisex">Unisex</option>
+                  <option value="Sleeveless">Sleeveless</option>
+                  <option value="Hoodies">Hoodies</option>
+                  <option value="Caps">Caps</option>
+                </select>
+                <div class="toolbar-right" id="prodCount">—</div>
+              </div>
+
+              <div class="table-scroll" id="tableBody">
+                <div class="loading-state">
+                  <div class="spinner"></div>
+                  <br />Loading products…
+                </div>
+              </div>
+
+              <div
+                class="pagination"
+                id="pagination"
+                style="display: none"
+              ></div>
+            </div>
+          </div>
+
+          <!-- ══ REVIEWS VIEW ═════════════════════════ -->
+          <div class="view" id="view-reviews">
+            <div class="view-header">
+              <div class="view-title">
+                <i class="fa-solid fa-images"></i> Reviews
+              </div>
+              <div class="view-subtitle">
+                Upload customer review screenshots — they appear live on the storefront
+              </div>
+            </div>
+
+            <div class="view-body">
+
+              <!-- ── Add Review Screenshot ── -->
+              <div class="form-card" style="margin-bottom: 2rem">
+                <div class="form-card-title">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Upload Review Screenshot
+                </div>
+
+                <div class="form-row" style="align-items: flex-end; gap: 1rem; flex-wrap: wrap">
+
+                  <!-- Cloudinary upload button -->
+                  <div class="form-group" style="flex: 0 0 auto">
+                    <label class="form-label">Screenshot Image</label>
+                    <input type="hidden" id="rv-image-url" />
+                    <button class="btn btn-ghost btn-md" id="rv-upload-btn" type="button">
+                      <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                    </button>
+                  </div>
+
+                  <!-- Preview -->
+                  <div id="rv-preview-wrap" style="display:none; flex: 0 0 auto">
+                    <img id="rv-preview" src="" alt="Preview"
+                      style="height: 80px; width: auto; border-radius: 3px;
+                             border: 1px solid var(--border2); object-fit: cover;" />
+                  </div>
+
+                  <!-- Optional caption -->
+                  <div class="form-group" style="flex: 1; min-width: 200px">
+                    <label class="form-label" for="rv-caption">Caption (optional)</label>
+                    <input type="text" id="rv-caption" class="form-input"
+                      placeholder="e.g. Verified buyer – Lagos" maxlength="120" />
+                  </div>
+
+                  <!-- Save button -->
+                  <div class="form-group" style="flex: 0 0 auto">
+                    <button class="btn btn-gold btn-md" id="rv-save-btn" type="button">
+                      <i class="fa-solid fa-floppy-disk"></i> Save Review
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- ── Existing Reviews ── -->
+              <div class="form-card-title" style="margin-bottom: 1rem">
+                <i class="fa-solid fa-grid-2"></i> Uploaded Reviews
+              </div>
+              <div id="adminReviewsContainer">
+                <!-- populated by reviews.js -->
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <!-- /content -->
+      </div>
+      <!-- /main -->
+    </div>
+    <!-- /layout -->
+
+    <!-- ══ EDIT MODAL ═══════════════════════════ -->
+    <div class="overlay" id="editOverlay">
+      <div class="modal">
+        <div class="modal-hdr">
+          <div class="modal-title">Edit Product</div>
+          <button class="modal-x" id="editClose">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="fg span2">
+              <label>Product Name *</label>
+              <input type="text" id="e-name" />
+            </div>
+            <div class="fg span2">
+              <label>Description</label>
+              <textarea id="e-desc" rows="3"></textarea>
+            </div>
+            <div class="fg">
+              <label>Category</label>
+              <select id="e-cat">
+                <option value="Unisex">Unisex</option>
+                <option value="Sleeveless">Sleeveless</option>
+                <option value="Hoodies">Hoodies</option>
+                <option value="Caps">Caps</option>
+              </select>
+            </div>
+            <div class="fg span2">
+              <label>Available Grades / Tiers</label>
+              <div class="chip-group" id="e-grades">
+                <label class="chip chip-all"
+                  ><input type="checkbox" value="__all__" /> All</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Standard Pro 250 GSM" /> Standard Pro 250 GSM</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="New Premium 320 GSM" /> New Premium 320 GSM</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Prime 350 GSM" /> Prime 350 GSM</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Stone Wash 370 GSM" /> Stone Wash 370 GSM</label
+                >
+              </div>
+            </div>
+
+            <!-- Per-grade price inputs (edit modal) -->
+            <div class="fg span2" id="e-grade-prices-wrap">
+              <label>Price Per Grade (₦)</label>
+              <div id="e-grade-prices" class="grade-price-grid"></div>
+              <small
+                style="
+                  font-size: 0.72rem;
+                  color: var(--muted);
+                  margin-top: 0.25rem;
+                  display: block;
+                "
+              >
+                Set a price for each selected grade. The lowest price will show
+                as "Starts from" on the storefront.
+              </small>
+            </div>
+
+            <!-- Sleeveless option (edit modal) -->
+            <div class="fg span2">
+              <label>Sleeve Option</label>
+              <label
+                class="chip"
+                id="e-sleeveless-chip"
+                style="display: inline-flex; width: auto"
+              >
+                <input type="checkbox" id="e-sleeveless" value="sleeveless" />
+                <i
+                  class="fa-solid fa-person-running"
+                  style="margin-right: 0.3rem"
+                ></i>
+                Has Sleeveless Version
+              </label>
+              <small
+                style="
+                  font-size: 0.72rem;
+                  color: var(--muted);
+                  margin-top: 0.25rem;
+                  display: block;
+                "
+              >
+                If checked, customers can choose between with-sleeves and
+                sleeveless.
+              </small>
+            </div>
+
+            <!-- Featured option (edit modal) -->
+            <div class="fg span2">
+              <label>Featured Item</label>
+              <label
+                class="chip"
+                id="e-featured-chip"
+                style="display: inline-flex; width: auto"
+              >
+                <input type="checkbox" id="e-featured" value="featured" />
+                <i
+                  class="fa-solid fa-star"
+                  style="margin-right: 0.3rem"
+                ></i>
+                Add to Featured Items
+              </label>
+              <small
+                style="
+                  font-size: 0.72rem;
+                  color: var(--muted);
+                  margin-top: 0.25rem;
+                  display: block;
+                "
+              >
+                Featured items appear on the homepage showcase section.
+              </small>
+            </div>
+
+            <div class="fg">
+              <label>Stock Quantity</label>
+              <input type="number" id="e-stock" min="0" />
+            </div>
+
+            <div class="fg span2">
+              <label>Available Sizes</label>
+              <div class="chip-group" id="e-sizes">
+                <label class="chip chip-all"
+                  ><input type="checkbox" value="__all__" /> All</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="M" /> M</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="L" /> L</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="XL" /> XL</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="2XL" /> 2XL</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="3XL" /> 3XL</label
+                >
+              </div>
+            </div>
+
+            <div class="fg span2">
+              <label>Available Colors</label>
+              <div class="chip-group" id="e-colors">
+                <label class="chip chip-all"
+                  ><input type="checkbox" value="__all__" /> All</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="White" /> White</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Black" /> Black</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Red" /> Red</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Navy Blue" /> Navy Blue</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Royal Blue" /> Royal Blue</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Sky Blue" /> Sky Blue</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Yellow" /> Yellow</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Grey" /> Grey</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Green" /> Green</label
+                >
+                <label class="chip"
+                  ><input type="checkbox" value="Purple" /> Purple</label
+                >
+              </div>
+            </div>
+
+            <div class="fg span2">
+              <label>Product Image (Cloudinary)</label>
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 0.5rem;
+                  align-items: center;
+                "
+              >
+                <button
+                  type="button"
+                  class="btn btn-gold btn-sm"
+                  id="e-upload-btn"
+                >
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                </button>
+                <input
+                  type="url"
+                  id="e-image-url"
+                  placeholder="Image URL (auto-filled)"
+                  style="flex: 1; min-width: 180px; font-size: 0.8rem"
+                />
+              </div>
+              <small
+                style="
+                  font-size: 0.75rem;
+                  color: var(--muted);
+                  margin-top: 0.15rem;
+                  display: block;
+                "
+              >
+                Leave blank to keep the current image. Or click
+                <strong>Upload Image</strong> to upload a new one to Cloudinary.
+              </small>
+              <div
+                id="e-preview-wrap"
+                style="display: none; margin-top: 0.75rem"
+              >
+                <div class="preview-wrap">
+                  <img
+                    class="preview-img"
+                    id="e-preview"
+                    src=""
+                    alt="Current image"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-ftr">
+          <button class="btn btn-ghost btn-md" id="editCancel">Cancel</button>
+          <button class="btn btn-gold btn-md" id="editSave">
+            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ DELETE CONFIRM MODAL ═════════════════ -->
+    <div class="overlay" id="delOverlay">
+      <div class="confirm-box">
+        <div class="confirm-icon"><i class="fa-solid fa-trash-can"></i></div>
+        <div class="confirm-title">Delete Product?</div>
+        <div class="confirm-body" id="delBody">
+          This will permanently remove the product and its image from your
+          store. This cannot be undone.
+        </div>
+        <div class="confirm-btns">
+          <button class="btn btn-ghost btn-md" id="delCancel">Cancel</button>
+          <button class="btn btn-danger-outline btn-md" id="delConfirm">
+            <i class="fa-solid fa-trash"></i> Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TOAST CONTAINER ══════════════════════ -->
+    <div id="toasts"></div>
+
+    <!-- Cloudinary Upload Widget -->
+    <script
+      src="https://upload-widget.cloudinary.com/global/all.js"
+      type="text/javascript"
+    ></script>
+    <script type="module" src="admin.js"></script>
+  </body>
+</html>

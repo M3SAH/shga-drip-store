@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SHGAdrip Admin — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <!--
+    FIX: admin-login.html previously ran its own initializeApp() with
+    placeholder config values, causing FirebaseError: invalid-api-key.
+    Now it imports { auth } from firebase-config.js — single init only.
+    The <script type="module"> below is the entire login logic.
+  -->
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --gold: #c9a84c;
+        --gold-light: #e2c06a;
+        --gold-dim: rgba(201, 168, 76, 0.12);
+        --black: #080808;
+        --surface: #111111;
+        --surface2: #191919;
+        --border: #242424;
+        --border2: #2e2e2e;
+        --text: #f0f0f0;
+        --muted: #808080;
+        --dim: #4a4a4a;
+        --danger: #e05555;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+        height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        height: 100%;
+        background: var(--black);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        overflow: auto;
+        position: relative;
+      }
+
+      .bg-grid {
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(201, 168, 76, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(201, 168, 76, 0.035) 1px, transparent 1px);
+        background-size: 56px 56px;
+        animation: gridDrift 20s linear infinite;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      @keyframes gridDrift {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: 56px 56px;
+        }
+      }
+
+      .bg-glow {
+        position: fixed;
+        width: 700px;
+        height: 700px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(201, 168, 76, 0.06) 0%,
+          transparent 65%
+        );
+        top: 20%;
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .card {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 400px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 2rem 1.25rem 1.75rem;
+        box-shadow:
+          0 32px 80px rgba(0, 0, 0, 0.7),
+          0 0 0 1px rgba(201, 168, 76, 0.05);
+        animation: cardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      @media (min-width: 480px) {
+        body {
+          padding: 1.5rem;
+        }
+        .card {
+          padding: 3rem 2.5rem 2.5rem;
+        }
+      }
+
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: translateY(24px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .logo {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .logo-mark {
+        font-family: "Bebas Neue", sans-serif;
+        font-size: 3rem;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        color: var(--text);
+      }
+      .logo-mark span {
+        color: var(--gold);
+      }
+      .logo-rule {
+        width: 36px;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--gold),
+          transparent
+        );
+        margin: 0.75rem auto;
+      }
+      .logo-tag {
+        font-size: 0.6rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .error-banner {
+        display: none;
+        align-items: center;
+        gap: 0.6rem;
+        background: rgba(224, 85, 85, 0.08);
+        border: 1px solid rgba(224, 85, 85, 0.25);
+        color: var(--danger);
+        padding: 0.75rem 1rem;
+        border-radius: 3px;
+        font-size: 0.82rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .error-banner.show {
+        display: flex;
+        animation: shake 0.35s ease;
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        20%,
+        60% {
+          transform: translateX(-5px);
+        }
+        40%,
+        80% {
+          transform: translateX(5px);
+        }
+      }
+
+      .field {
+        margin-bottom: 1.15rem;
+      }
+      .field label {
+        display: block;
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 0.45rem;
+      }
+      .input-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .input-row .icon {
+        position: absolute;
+        left: 0.95rem;
+        color: var(--dim);
+        font-size: 0.8rem;
+        pointer-events: none;
+        transition: color 0.2s;
+      }
+
+      .input-row input {
+        width: 100%;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: 3px;
+        padding: 0.82rem 2.75rem 0.82rem 2.6rem;
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-size: 16px;
+        min-height: 48px;
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      @media (min-width: 480px) {
+        .input-row input {
+          font-size: 0.92rem;
+        }
+      }
+
+      .input-row input:focus {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 3px var(--gold-dim);
+      }
+      .input-row:focus-within .icon {
+        color: var(--gold);
+      }
+      .input-row input::placeholder {
+        color: var(--dim);
+      }
+
+      .toggle-pw {
+        position: absolute;
+        right: 0.9rem;
+        background: none;
+        border: none;
+        color: var(--dim);
+        cursor: pointer;
+        font-size: 0.82rem;
+        padding: 0.25rem;
+        transition: color 0.2s;
+      }
+      .toggle-pw:hover {
+        color: var(--muted);
+      }
+
+      .btn-submit {
+        width: 100%;
+        margin-top: 1.5rem;
+        background: var(--gold);
+        color: #000;
+        border: none;
+        border-radius: 3px;
+        padding: 0.9rem;
+        min-height: 48px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition:
+          background 0.2s,
+          transform 0.1s,
+          box-shadow 0.2s;
+      }
+
+      .btn-submit:hover {
+        background: var(--gold-light);
+        box-shadow: 0 4px 20px rgba(201, 168, 76, 0.3);
+      }
+      .btn-submit:active {
+        transform: scale(0.99);
+      }
+      .btn-submit:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+
+      .spin {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(0, 0, 0, 0.3);
+        border-top-color: #000;
+        border-radius: 50%;
+        animation: spin 0.55s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .footer-note {
+        text-align: center;
+        margin-top: 2rem;
+        font-size: 0.65rem;
+        color: var(--dim);
+        letter-spacing: 0.06em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <div class="card">
+      <div class="logo">
+        <div class="logo-mark">SHGA<span>drip</span></div>
+        <div class="logo-rule"></div>
+        <div class="logo-tag">Admin Portal</div>
+      </div>
+
+      <div class="error-banner" id="errorBanner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="errorText">Invalid credentials.</span>
+      </div>
+
+      <div class="field">
+        <label for="email">Email Address</label>
+        <div class="input-row">
+          <i class="icon fa-solid fa-envelope"></i>
+          <input
+            type="email"
+            id="email"
+            placeholder="admin@shgadrip.com"
+            autocomplete="email"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-row">
+          <i class="icon fa-solid fa-lock"></i>
+          <input
+            type="password"
+            id="password"
+            placeholder="••••••••••"
+            autocomplete="current-password"
+          />
+          <button
+            class="toggle-pw"
+            id="togglePw"
+            type="button"
+            aria-label="Show/hide password"
+          >
+            <i class="fa-solid fa-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-submit" id="loginBtn" type="button">
+        <i class="fa-solid fa-right-to-bracket"></i> Sign In
+      </button>
+
+      <p class="footer-note">© 2026 SHGAdrip · Secured by Firebase Auth</p>
+    </div>
+
+    <script type="module">
+      /*
+       * Import auth from the shared firebase-config.js in the project root.
+       * admin-login.html lives inside /admin, so we go one level up.
+       */
+      import { auth } from "../firebase-config.js";
+
+      import {
+        signInWithEmailAndPassword,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+      // Already logged in → skip straight to dashboard
+      onAuthStateChanged(auth, (user) => {
+        if (user) window.location.href = "admin-dashboard.html";
+      });
+
+      const loginBtn = document.getElementById("loginBtn");
+      const emailEl = document.getElementById("email");
+      const passwordEl = document.getElementById("password");
+      const errorBanner = document.getElementById("errorBanner");
+      const errorText = document.getElementById("errorText");
+      const togglePw = document.getElementById("togglePw");
+      const eyeIcon = document.getElementById("eyeIcon");
+
+      togglePw.addEventListener("click", () => {
+        const show = passwordEl.type === "password";
+        passwordEl.type = show ? "text" : "password";
+        eyeIcon.className = show ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+      });
+
+      async function doLogin() {
+        const email = emailEl.value.trim();
+        const password = passwordEl.value;
+
+        if (!email || !password)
+          return showError("Please enter your email and password.");
+
+        errorBanner.classList.remove("show");
+        setLoading(true);
+
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+          window.location.href = "admin-dashboard.html";
+        } catch (err) {
+          setLoading(false);
+          const map = {
+            "auth/invalid-email": "Invalid email address.",
+            "auth/user-not-found": "No account found for this email.",
+            "auth/wrong-password": "Incorrect password.",
+            "auth/invalid-credential": "Invalid email or password.",
+            "auth/too-many-requests":
+              "Too many failed attempts. Try again later.",
+            "auth/network-request-failed":
+              "Network error. Check your connection.",
+          };
+          showError(map[err.code] || `Login failed: ${err.message}`);
+        }
+      }
+
+      loginBtn.addEventListener("click", doLogin);
+      [emailEl, passwordEl].forEach((el) =>
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") doLogin();
+        }),
+      );
+
+      function showError(msg) {
+        errorText.textContent = msg;
+        errorBanner.classList.remove("show");
+        void errorBanner.offsetWidth; // force reflow → re-trigger shake animation
+        errorBanner.classList.add("show");
+      }
+
+      function setLoading(on) {
+        loginBtn.disabled = on;
+        loginBtn.innerHTML = on
+          ? '<span class="spin"></span> Signing in…'
+          : '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+      }
+
+    </script>
+  </body>
+</html>

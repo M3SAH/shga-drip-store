@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5.0"
+    />
+    <meta
+      name="description"
+      content="Single product view — SHGAdrip streetwear. Luxury in Every Drip."
+    />
+    <title>Product | SHGAdrip</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="header" id="header">
+      <div class="container">
+        <nav class="nav">
+          <a class="logo" href="./index.html" aria-label="SHGAdrip Home">
+            <span class="logo-shga">SHGA</span
+            ><span class="logo-drip">drip</span>
+            <span class="logo-tag">LUXURY IN EVERY DRIP</span>
+          </a>
+          <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+          </button>
+          <div class="nav-menu" id="navMenu">
+            <a href="./index.html" class="nav-link">Home</a>
+            <a href="./collections/" class="nav-link active">Collection</a>
+            <a href="./index.html#about" class="nav-link">About</a>
+            <a href="./index.html#contact" class="nav-link">Order Now</a>
+            <a
+              href="https://wa.me/2348134421763"
+              target="_blank"
+              rel="noopener"
+              class="btn btn-wa nav-wa"
+            >
+              <i class="fa-brands fa-whatsapp"></i> WhatsApp
+            </a>
+          </div>
+          <div class="nav-overlay" id="navOverlay"></div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="product-page">
+      <div class="container">
+        <div class="product-breadcrumb">
+          <a href="./collections/" class="breadcrumb-link"
+            ><i class="fa-solid fa-arrow-left"></i> Back to Collections</a
+          >
+        </div>
+
+        <div id="productState" class="product-state" aria-live="polite"></div>
+
+        <section id="productShell" class="product-shell" style="display: none">
+          <div class="product-media">
+            <div class="product-img">
+              <img
+                id="productImg"
+                src=""
+                alt=""
+                loading="eager"
+                decoding="async"
+              />
+            </div>
+          </div>
+
+          <div class="product-details">
+            <p id="productCategory" class="modal-cat"></p>
+            <h1 id="productName" class="product-title"></h1>
+            <p id="productPrice" class="product-price"></p>
+            <p id="productDesc" class="modal-desc"></p>
+
+            <div class="product-selectors">
+              <div class="product-select">
+                <label for="gradeSelect">Shirt Grade</label>
+                <select id="gradeSelect"></select>
+              </div>
+              <div class="product-select">
+                <label for="sleeveSelect">Sleeve Style</label>
+                <select id="sleeveSelect"></select>
+              </div>
+              <div class="product-select">
+                <label for="sizeSelect">Size</label>
+                <select id="sizeSelect"></select>
+              </div>
+              <div class="product-select">
+                <label for="colorSelect">Color</label>
+                <select id="colorSelect"></select>
+              </div>
+            </div>
+
+            <div class="product-actions">
+              <a
+                id="waOrderBtn"
+                class="btn btn-wa"
+                href="#"
+                target="_blank"
+                rel="noopener"
+              >
+                <i class="fa-brands fa-whatsapp"></i> Buy on WhatsApp
+              </a>
+              <a href="./collections/" class="btn btn-ghost"
+                >View More Products</a
+              >
+            </div>
+
+            <aside
+              class="delivery-box"
+              aria-label="Delivery and payment information"
+            >
+              <h3>
+                <i class="fa-solid fa-truck-fast"></i> Delivery &amp; Payment
+              </h3>
+              <div class="delivery-lines">
+                <p><strong>Delivery within Abuja</strong></p>
+                <p>
+                  Pay on delivery available within Abuja. <br />Delivery time: 1
+                  - 2 days.
+                </p>
+                <p class="delivery-sep"></p>
+                <p><strong>Delivery outside Abuja</strong></p>
+                <p>
+                  Delivery outside Abuja takes 3 - 4 days. <br />
+                  Payment must be made before the order is dispatched.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-top">
+          <div class="footer-logo">SHGA<span>drip</span></div>
+          <p class="footer-tagline">Luxury in Every Drip</p>
+        </div>
+        <div class="footer-links">
+          <a href="./index.html">Home</a>
+          <a href="./collections/">Collection</a>
+          <a href="./index.html#about">About</a>
+          <a href="./index.html#contact">Order</a>
+          <a
+            href="https://www.instagram.com/shga_drip_"
+            target="_blank"
+            rel="noopener"
+          >
+            <i class="fa-brands fa-instagram"></i> Instagram
+          </a>
+        </div>
+        <p class="copyright">
+          © 2026 SHGAdrip. All Rights Reserved. · Abuja, Nigeria
+        </p>
+      </div>
+    </footer>
+
+    <a
+      href="https://wa.me/2348134421763"
+      class="floating-wa"
+      target="_blank"
+      rel="noopener"
+      aria-label="Chat on WhatsApp"
+    >
+      <i class="fa-brands fa-whatsapp"></i>
+    </a>
+
+    <script type="module" src="./js/products.js"></script>
+    <script type="module" src="./js/product-page.js"></script>
+  </body>
+</html>
