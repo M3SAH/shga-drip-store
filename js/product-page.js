@@ -59,14 +59,19 @@
       ? `Fixed Price: ${formatPrice(grade?.price || product.price || 0)}`
       : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(grade?.price || DEFAULT_GRADES[0].price)}`;
 
+    const imageUrl       = product.imageUrl || product.image || "";
+    const productPageUrl = `${window.location.origin}/product.html?id=${encodeURIComponent(product.id)}`;
+
     const msg =
       `Hi SHGAdrip! I'd like to order:\n\n` +
       `Design: ${product.name}\n` +
       `${gradeInfo}\n` +
       `${sleeve ? `Sleeve Style: ${sleeve}\n` : ""}` +
-      `${size ? `Size: ${size}\n` : ""}` +
-      `${color ? `Color: ${color}\n` : ""}` +
-      `\nPlease confirm availability and delivery details. Thanks!`;
+      `${size   ? `Size: ${size}\n`           : ""}` +
+      `${color  ? `Color: ${color}\n`         : ""}` +
+      (imageUrl ? `\n🖼 Product Image: ${imageUrl}` : "") +
+      `\n🔗 Product Page: ${productPageUrl}` +
+      `\n\nPlease confirm availability and delivery details. Thanks!`;
 
     return `https://wa.me/${BUSINESS_WA}?text=${encodeURIComponent(msg)}`;
   }
@@ -254,23 +259,6 @@
           size: sizeVal,
           color: colorVal,
         });
-      }
-
-      // Wire add-to-cart button on this page
-      const addToCartBtn = $("productAddToCart");
-      if (addToCartBtn && window.SHGACart) {
-        addToCartBtn.onclick = () => {
-          window.SHGACart.add({
-            productId:  product.id,
-            design:     product.name,
-            imageUrl:   product.imageUrl || product.image || "",
-            shirtGrade: selectedGrade ? selectedGrade.name : null,
-            price:      priceVal,
-            size:       sizeVal || null,
-            sleeveStyle: (product.category === "Caps") ? null : sleeveName,
-            color:      colorVal || null,
-          });
-        };
       }
     }
 

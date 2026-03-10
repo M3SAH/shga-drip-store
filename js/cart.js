@@ -146,6 +146,8 @@
     const baseUrl = window.location.origin;
     const lines = cart.map((item, i) => {
       const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(item.productId)}`;
+      // always send something under the "Image" label; fall back to product page
+      const imgLink = item.imageUrl ? item.imageUrl : productPageUrl;
       return (
         `${i + 1}. ${item.design}` +
         (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
@@ -153,7 +155,7 @@
         (item.sleeveStyle ? ` · ${item.sleeveStyle}`        : "") +
         (item.color       ? ` · ${item.color}`              : "") +
         ` — ${fmt(item.price)} x ${item.quantity}` +
-        (item.imageUrl    ? `\n   🖼 Image: ${item.imageUrl}` : "") +
+        `\n   🖼 Image: ${imgLink}` +
         `\n   🔗 View: ${productPageUrl}`
       );
     }).join("\n\n");

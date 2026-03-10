@@ -84,10 +84,9 @@ window.products = window.products || [];
 const products  = window.products;   // live reference — always reads the current array
 
 // ===================================
-// CART — delegated to shared cart.js (window.SHGACart)
+// CART
 // ===================================
-// Use a proxy reference so all cart reads/writes go through SHGACart
-const getCart = () => window.SHGACart ? window.SHGACart.getAll() : [];
+let cart = [];
 
 // ===================================
 // SLEEVE STYLES
@@ -139,10 +138,14 @@ const navToggle    = $("navToggle");
 const navMenu      = $("navMenu");
 const navOverlay   = $("navOverlay");
 const header       = $("header");
-// Cart DOM refs — managed by cart.js, not needed here
 const cartBtn      = $("cartBtn");
 const cartPanel    = $("cartPanel");
 const cartOverlay  = $("cartOverlay");
+const cartItems    = $("cartItems");
+const cartCount    = $("cartCount");
+const cartTotal    = $("cartTotal");
+const cartWaBtn    = $("cartWaBtn");
+const cartEmptyMsg = $("cartEmptyMsg");
 
 // ===================================
 // UTILS
@@ -159,21 +162,38 @@ const contrastColor = (hex) => {
 };
 
 const buildSingleWaLink = (product, grade, color) => {
-  const phone     = "2348134421763";
-  const gradeInfo = product.type === "sleeveless"
+  const phone      = "2348134421763";
+  const gradeInfo  = product.type === "sleeveless"
     ? `Fixed Price: ${formatPrice(product.price || 0)}`
     : `Shirt Grade: ${grade.name} — ${formatPrice(grade.price)}`;
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
   const sizeInfo   = (product.category !== "Caps" && state.selectedSize) ? `Size: ${state.selectedSize.label}` : "";
+  const imageUrl   = product.imageUrl || product.image || "";
+  const productPageUrl = `${window.location.origin}/product.html?id=${encodeURIComponent(product.id)}`;
   const msg =
     `Hi SHGAdrip! I'd like to order:\n\n` +
-    `Design: ${product.name}\n${gradeInfo}\n${sleeveInfo}\n${sizeInfo}\n${colorInfo}\n\n` +
-    `Please confirm availability and delivery details. Thanks!`;
+    `Design: ${product.name}\n${gradeInfo}\n${sleeveInfo}\n${sizeInfo}\n${colorInfo}\n` +
+    (imageUrl ? `\n🖼 Product Image: ${imageUrl}` : "") +
+    `\n🔗 Product Page: ${productPageUrl}` +
+    `\n\nPlease confirm availability and delivery details. Thanks!`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 };
 
-const buildCartWaLink = () => window.SHGACart ? window.SHGACart.buildWaLink() : "#";
+const buildCartWaLink = () => {
+  const phone = "2348134421763";
+  const lines = cart.map((item, i) =>
+    `${i + 1}. ${item.design}` +
+    (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
+    (item.size        ? ` · Size ${item.size}`          : "") +
+    (item.sleeveStyle ? ` · ${item.sleeveStyle}`        : "") +
+    (item.color       ? ` · ${item.color}`              : "") +
+    ` — ${formatPrice(item.price)} x ${item.quantity}`
+  ).join("\n");
+  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const msg   = `Hi SHGAdrip! Here's my order:\n\n${lines}\n\nTotal: ${formatPrice(total)}\n\nPlease confirm details. Thanks!`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+};
 
 // FIX: guard against undefined price (Firestore product before price is set)
 // Uses per-product gradePrices if available; falls back to SHIRT_GRADES defaults.
@@ -514,14 +534,23 @@ const closeModal = () => {
 };
 
 // ===================================
-// CART UI — all delegated to cart.js
+// CART
 // ===================================
 const updateCartUI = () => {
-  if (window.SHGACart) window.SHGACart.updateBadge();
+  const total = cart.reduce((s, i) => s + i.quantity, 0);
+  if (total > 0) {
+    cartCount.textContent = total;
+    cartCount.style.display = "flex";
+  } else {
+    cartCount.style.display = "none";
+  }
+  const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  cartTotal.textContent = formatPrice(totalPrice);
+  cartEmptyMsg.style.display = cart.length === 0 ? "block" : "none";
+  cartWaBtn.style.display    = cart.length > 0  ? "block" : "none";
 };
 
 const addToCart = (productId, gradeIdx) => {
-  if (!window.SHGACart) return;
   const source  = window.products || [];
   const product = source.find(p => String(p.id) === String(productId));
   if (!product) return;
@@ -530,42 +559,106 @@ const addToCart = (productId, gradeIdx) => {
   const grade = product.type === "sleeveless" ? null : (productGrades[gradeIdx] || productGrades[0]);
   const price = product.type === "sleeveless" ? (product.price || 0) : (grade ? grade.price : 0);
 
-  const baseUrl = window.location.origin;
-  const imageUrl = product.imageUrl || product.image || "";
-  const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(product.id)}`;
-
-  window.SHGACart.add({
+  const item = {
     productId,
     design:     product.name,
-    imageUrl,
-    productPageUrl,
     shirtGrade: grade ? grade.name : null,
     price,
     size:        state.selectedSize   ? state.selectedSize.label   : null,
     sleeveStyle: state.selectedSleeve ? state.selectedSleeve.name  : null,
     color:       state.selectedColor  ? state.selectedColor.name   : null,
-  });
+    quantity:    1,
+  };
+
+  const key = `${productId}-${item.shirtGrade}-${item.size}-${item.sleeveStyle}-${item.color}`;
+  const existing = cart.find(c =>
+    `${c.productId}-${c.shirtGrade}-${c.size}-${c.sleeveStyle}-${c.color}` === key
+  );
+
+  if (existing) {
+    existing.quantity++;
+  } else {
+    cart.push(item);
+  }
+
+  updateCartUI();
+  showCartToast(product.name, item.shirtGrade, item.size, item.sleeveStyle, item.color, price);
 };
 
 window.changeQty = (idx, delta) => {
-  if (window.SHGACart) window.SHGACart.changeQty(idx, delta);
+  cart[idx].quantity += delta;
+  if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+  updateCartUI();
+  renderCartItems();
 };
 
 window.removeFromCart = (idx) => {
-  if (window.SHGACart) window.SHGACart.remove(idx);
+  cart.splice(idx, 1);
+  updateCartUI();
+  renderCartItems();
 };
 
 const renderCartItems = () => {
-  if (window.SHGACart) window.SHGACart.renderItems();
+  if (cart.length === 0) { cartItems.innerHTML = ""; return; }
+  cartItems.innerHTML = cart.map((item, idx) => {
+    const colorObj   = SHIRT_COLORS.find(c => c.name === item.color);
+    const swatchStyle = colorObj
+      ? `background:${colorObj.hex};`
+      : "background:var(--grey);";
+
+    return `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <p class="cart-item-name">${item.design}</p>
+        <div class="cart-item-meta">
+          ${item.shirtGrade ? `<span class="cart-meta-badge">${item.shirtGrade}</span>` : `<span class="cart-meta-badge">Fixed</span>`}
+          ${item.size        ? `<span class="cart-meta-badge cart-meta-badge--size">${item.size}</span>` : ""}
+          ${item.sleeveStyle ? `<span class="cart-meta-badge cart-meta-badge--sleeve"><i class="${item.sleeveStyle === 'Sleeveless' ? 'fa-solid fa-person-running' : 'fa-solid fa-shirt'}"></i> ${item.sleeveStyle}</span>` : ""}
+          <span class="cart-color-dot" style="${swatchStyle}" title="${item.color}"></span>
+          <span class="cart-item-color-name">${item.color || ""}</span>
+        </div>
+        <p class="cart-item-price">${formatPrice(item.price)}</p>
+      </div>
+      <div class="cart-item-controls">
+        <button class="cart-qty-btn" onclick="changeQty(${idx},-1)">−</button>
+        <span class="cart-qty-num">${item.quantity}</span>
+        <button class="cart-qty-btn" onclick="changeQty(${idx},1)">+</button>
+        <button class="cart-remove-btn" onclick="removeFromCart(${idx})" aria-label="Remove">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>`;
+  }).join("");
 };
 
-const showCartToast = () => {}; // handled inside SHGACart.add()
+const showCartToast = (name, grade, size, sleeve, color, price) => {
+  const existing = document.querySelector(".cart-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "cart-toast";
+  toast.innerHTML = `
+    <i class="fa-solid fa-circle-check"></i>
+    <span><strong>${name}</strong>${grade ? ` · ${grade}` : ""}${size ? ` · ${size}` : ""}${sleeve ? ` · ${sleeve}` : ""}${color ? ` · ${color}` : ""} — ${formatPrice(price)}</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add("visible"), 10);
+  setTimeout(() => { toast.classList.remove("visible"); setTimeout(() => toast.remove(), 300); }, 2800);
+};
 
 // ===================================
 // CART PANEL
 // ===================================
-const openCart = () => { if (window.SHGACart) window.SHGACart.open(); };
-const closeCart = () => { if (window.SHGACart) window.SHGACart.close(); };
+const openCart = () => {
+  renderCartItems();
+  cartPanel.classList.add("open");
+  cartOverlay.classList.add("active");
+  document.body.style.overflow = "hidden";
+};
+
+const closeCart = () => {
+  cartPanel.classList.remove("open");
+  cartOverlay.classList.remove("active");
+  document.body.style.overflow = "";
+};
 
 // ===================================
 // MOBILE NAV
@@ -626,18 +719,25 @@ const initEvents = () => {
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
   $("modalAddToCart").addEventListener("click", () => {
-    const productId = $("modalAddToCart").dataset.productId;
+    const productId = $("modalAddToCart").dataset.productId; // keep as string (Firebase doc ID)
     const gradeIdx  = parseInt($("modalAddToCart").dataset.gradeIdx || "0", 10);
     addToCart(productId, gradeIdx);
     closeModal();
   });
 
-  // cart open/close/WA handled by cart.js — only keep Escape for modal
+  cartBtn.addEventListener("click", openCart);
+  cartOverlay.addEventListener("click", closeCart);
+  $("cartClose").addEventListener("click", closeCart);
+  cartWaBtn.addEventListener("click", () => {
+    if (cart.length === 0) return;
+    window.open(buildCartWaLink(), "_blank", "noopener");
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (modal.classList.contains("active")) closeModal();
       if (navMenu.classList.contains("open")) closeNav();
+      if (cartPanel.classList.contains("open")) closeCart();
     }
   });
 
@@ -702,6 +802,7 @@ const initObserver = () => {
 //      empty grid before Firebase responds.
 // ===================================
 const init = () => {
+  updateCartUI();
   initEvents();
   initObserver();
   initPublicReviews();
