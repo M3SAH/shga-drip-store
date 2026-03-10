@@ -1956,7 +1956,18 @@
                   </select>
                 </div>
 
-                <div class="fg span2">
+                <!-- Fixed price for Caps / Hoodies -->
+                <div class="fg span2" id="a-fixed-price-wrap" style="display: none;">
+                  <label>Price (₦) *</label>
+                  <input type="number" id="a-fixed-price" placeholder="e.g. 10000" min="0" step="100"
+                    style="max-width: 180px;" />
+                  <small
+                    style="font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; display: block;">
+                    Caps and Hoodies use a single fixed price.
+                  </small>
+                </div>
+
+                <div class="fg span2" id="a-grades-wrap">
                   <label>Available Grades / Tiers</label>
                   <div class="chip-group" id="a-grades">
                     <label class="chip chip-all"
@@ -1979,7 +1990,7 @@
                   </div>
                 </div>
 
-                <!-- Per-grade price inputs (shown dynamically) -->
+                <!-- Per-grade price inputs (shown for shirts only) -->
                 <div class="fg span2" id="a-grade-prices-wrap">
                   <label>Price Per Grade (₦) *</label>
                   <div id="a-grade-prices" class="grade-price-grid"></div>
@@ -2340,7 +2351,18 @@
                 <option value="Caps">Caps</option>
               </select>
             </div>
-            <div class="fg span2">
+            <!-- Fixed price for Caps / Hoodies (edit) -->
+            <div class="fg span2" id="e-fixed-price-wrap" style="display: none;">
+              <label>Price (₦) *</label>
+              <input type="number" id="e-fixed-price" placeholder="e.g. 10000" min="0" step="100"
+                style="max-width: 180px;" />
+              <small
+                style="font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; display: block;">
+                Caps and Hoodies use a single fixed price.
+              </small>
+            </div>
+
+            <div class="fg span2" id="e-grades-wrap">
               <label>Available Grades / Tiers</label>
               <div class="chip-group" id="e-grades">
                 <label class="chip chip-all"

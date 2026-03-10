@@ -137,6 +137,7 @@ function initAdminUI() {
   initGradePriceInputs("a-grades", "a-grade-prices");
   initSleevelessChip("a-sleeveless");
   initFeaturedChip("a-featured");
+  initAddFormCategoryToggle();
   document.getElementById("addBtn").addEventListener("click",   handleAdd);
   document.getElementById("resetBtn").addEventListener("click", resetAddForm);
 
@@ -148,6 +149,7 @@ function initAdminUI() {
   initGradePriceInputs("e-grades", "e-grade-prices");
   initSleevelessChip("e-sleeveless");
   initFeaturedChip("e-featured");
+  initEditFormCategoryToggle();
 
   const editOverlay = document.getElementById("editOverlay");
   document.getElementById("editClose").addEventListener("click",  closeEditModal);
@@ -428,19 +430,17 @@ async function handleAdd() {
   const desc  = val("a-desc");
   const cat   = val("a-cat");
   const stock = parseInt(val("a-stock"))   || 0;
-  const grades   = getChecked("a-grades");
+  let grades   = getChecked("a-grades");
   const sizes    = getChecked("a-sizes");
   const colors   = getChecked("a-colors");
   const imageUrl = val("a-image-url").trim();
   const hasSleeveless = document.getElementById("a-sleeveless")?.checked || false;
   const isFeatured = document.getElementById("a-featured")?.checked || false;
 
-  // Collect per-grade prices
-  const gradePrices = getGradePrices("a-grade-prices", grades);
+  const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
 
   if (!name)           return toast("Product name is required.", "error");
   if (!cat)            return toast("Please select a category.", "error");
-  if (!grades.length)  return toast("Please select at least one grade.", "error");
   if (!sizes.length)   return toast("Please select at least one size.", "error");
   if (!colors.length)  return toast("Please select at least one color.", "error");
   if (!imageUrl)       return toast("Please upload a product image using the Upload Image button.", "error");
@@ -448,15 +448,25 @@ async function handleAdd() {
     return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
   }
 
-  // Validate all selected grades have a price
-  for (const grade of grades) {
-    if (!gradePrices[grade] || gradePrices[grade] <= 0) {
-      return toast(`Please enter a price for the "${grade}" grade.`, "error");
-    }
-  }
+  let gradePrices = {};
+  let minPrice = 0;
 
-  // Lowest grade price = the "starts from" price on storefront
-  const minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
+  if (isFixedPriceCat) {
+    const fixedPrice = parseFloat(val("a-fixed-price")) || 0;
+    if (fixedPrice <= 0) return toast("Please enter a price for Caps/Hoodies.", "error");
+    grades = ["Fixed Price"];
+    gradePrices = { "Fixed Price": fixedPrice };
+    minPrice = fixedPrice;
+  } else {
+    gradePrices = getGradePrices("a-grade-prices", grades);
+    if (!grades.length)  return toast("Please select at least one grade.", "error");
+    for (const grade of grades) {
+      if (!gradePrices[grade] || gradePrices[grade] <= 0) {
+        return toast(`Please enter a price for the "${grade}" grade.`, "error");
+      }
+    }
+    minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
+  }
 
   const btn = document.getElementById("addBtn");
   setBtnLoading(btn, true);
@@ -493,9 +503,10 @@ async function handleAdd() {
 }
 
 function resetAddForm() {
-  ["a-name","a-desc","a-stock"].forEach(id => set(id, ""));
+  ["a-name","a-desc","a-stock","a-fixed-price"].forEach(id => set(id, ""));
   set("a-cat", "");
   set("a-image-url", "");
+  togglePricingUI("add");
 
   // Grades — default New Premium 320 GSM only
   document.querySelectorAll("#a-grades .chip input[type=checkbox]").forEach(cb => {
@@ -546,17 +557,21 @@ function openEditModal(docId) {
   set("e-stock", p.stock       || "");
   set("e-cat",   p.category    || "Unisex");
   set("e-image-url", p.imageUrl || p.image || "");
+  set("e-fixed-price", p.price || "");
 
-  // Grades: support both new `grades` array and old single `grade` string
-  const savedGrades = Array.isArray(p.grades) && p.grades.length
-    ? p.grades
-    : (p.grade ? [p.grade] : ["New Premium 320 GSM"]);
-  document.querySelectorAll("#e-grades .chip input[type=checkbox]").forEach(cb => {
-    cb.checked = savedGrades.includes(cb.value);
-    cb.closest(".chip").classList.toggle("checked", cb.checked);
-  });
-  syncAllChip("e-grades");
-  renderGradePriceInputs("e-grades", "e-grade-prices", p.gradePrices || {});
+  const isFixedPriceCat = FIXED_PRICE_CATS.includes(p.category || "");
+  if (!isFixedPriceCat) {
+    const savedGrades = Array.isArray(p.grades) && p.grades.length
+      ? p.grades
+      : (p.grade ? [p.grade] : ["New Premium 320 GSM"]);
+    document.querySelectorAll("#e-grades .chip input[type=checkbox]").forEach(cb => {
+      cb.checked = savedGrades.includes(cb.value);
+      cb.closest(".chip").classList.toggle("checked", cb.checked);
+    });
+    syncAllChip("e-grades");
+    renderGradePriceInputs("e-grades", "e-grade-prices", p.gradePrices || {});
+  }
+  togglePricingUI("edit");
 
   const normalizedSizes = (p.sizes || []).map(s => {
     const v = String(s || "").toUpperCase().trim();
@@ -610,30 +625,40 @@ async function handleSaveEdit() {
   const desc  = val("e-desc");
   const cat   = val("e-cat");
   const stock = parseInt(val("e-stock"))   || 0;
-  const grades   = getChecked("e-grades");
+  let grades   = getChecked("e-grades");
   const sizes    = getChecked("e-sizes");
   const colors   = getChecked("e-colors");
   const newUrl   = val("e-image-url").trim();
   const hasSleeveless = document.getElementById("e-sleeveless")?.checked || false;
   const isFeatured = document.getElementById("e-featured")?.checked || false;
 
-  const gradePrices = getGradePrices("e-grade-prices", grades);
+  const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
+  let gradePrices = {};
+  let minPrice = 0;
+
+  if (isFixedPriceCat) {
+    const fixedPrice = parseFloat(val("e-fixed-price")) || 0;
+    if (fixedPrice <= 0) return toast("Please enter a price for Caps/Hoodies.", "error");
+    grades = ["Fixed Price"];
+    gradePrices = { "Fixed Price": fixedPrice };
+    minPrice = fixedPrice;
+  } else {
+    gradePrices = getGradePrices("e-grade-prices", grades);
+    if (!grades.length) return toast("Please select at least one grade.", "error");
+    for (const grade of grades) {
+      if (!gradePrices[grade] || gradePrices[grade] <= 0) {
+        return toast(`Please enter a price for the "${grade}" grade.`, "error");
+      }
+    }
+    minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
+  }
 
   if (!name)          return toast("Product name is required.", "error");
-  if (!grades.length) return toast("Please select at least one grade.", "error");
   if (!sizes.length)  return toast("Please select at least one size.", "error");
   if (!colors.length) return toast("Please select at least one color.", "error");
   if (newUrl && !isCloudinaryUrl(newUrl)) {
     return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
   }
-
-  for (const grade of grades) {
-    if (!gradePrices[grade] || gradePrices[grade] <= 0) {
-      return toast(`Please enter a price for the "${grade}" grade.`, "error");
-    }
-  }
-
-  const minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
 
   const btn = document.getElementById("editSave");
   setBtnLoading(btn, true);
@@ -909,6 +934,37 @@ function initReviewsUpload() {
       setBtnLoading(saveBtn, false, '<i class="fa-solid fa-floppy-disk"></i> Save Review');
     }
   });
+}
+
+/* ══════════════════════════════════════════════
+   CATEGORY TOGGLE — show shirt grades vs fixed price (Caps/Hoodies)
+══════════════════════════════════════════════ */
+const FIXED_PRICE_CATS = ["Caps", "Hoodies"];
+
+function togglePricingUI(form) {
+  const isAdd = form === "add";
+  const cat = val(isAdd ? "a-cat" : "e-cat");
+  const useFixed = FIXED_PRICE_CATS.includes(cat);
+
+  const fixedWrap = document.getElementById(isAdd ? "a-fixed-price-wrap" : "e-fixed-price-wrap");
+  const gradesWrap = document.getElementById(isAdd ? "a-grades-wrap" : "e-grades-wrap");
+  const gradePricesWrap = document.getElementById(isAdd ? "a-grade-prices-wrap" : "e-grade-prices-wrap");
+
+  if (fixedWrap) fixedWrap.style.display = useFixed ? "block" : "none";
+  if (gradesWrap) gradesWrap.style.display = useFixed ? "none" : "block";
+  if (gradePricesWrap) gradePricesWrap.style.display = useFixed ? "none" : "block";
+}
+
+function initAddFormCategoryToggle() {
+  const catSelect = document.getElementById("a-cat");
+  if (!catSelect) return;
+  catSelect.addEventListener("change", () => togglePricingUI("add"));
+}
+
+function initEditFormCategoryToggle() {
+  const catSelect = document.getElementById("e-cat");
+  if (!catSelect) return;
+  catSelect.addEventListener("change", () => togglePricingUI("edit"));
 }
 
 /* ══════════════════════════════════════════════
