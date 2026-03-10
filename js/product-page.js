@@ -269,6 +269,38 @@
 
     updatePriceAndLink();
 
+    // wire up add-to-cart button (item computation mirrors updatePriceAndLink)
+    const addToCartBtn = $("productAddToCart");
+    if (addToCartBtn && window.SHGACart) {
+      addToCartBtn.addEventListener("click", () => {
+        const sleeveVal = sleeveSelect ? sleeveSelect.value : "sleeved";
+        const sleeveName = sleeveVal === "sleeveless" ? "Sleeveless" : "With Sleeves";
+        const sizeVal = (product.category === "Caps") ? "" : (sizeSelect ? sizeSelect.value : "");
+        const colorVal = colorSelect ? colorSelect.value : "";
+
+        let selectedGrade = null;
+        if (product.type !== "sleeveless") {
+          const gradeName = gradeSelect ? decodeURIComponent(gradeSelect.value || "") : "";
+          selectedGrade = (grades.length ? grades : DEFAULT_GRADES).find(g => g.name === gradeName) || (grades[0] || DEFAULT_GRADES[0]);
+        }
+
+        const priceVal = product.type === "sleeveless"
+          ? Number(product.price) || 0
+          : Number(selectedGrade?.price || 0);
+
+        window.SHGACart.add({
+          productId: product.id,
+          design: product.name,
+          imageUrl: product.imageUrl || product.image || "",
+          shirtGrade: selectedGrade ? selectedGrade.name : null,
+          price: priceVal,
+          size: sizeVal || null,
+          sleeveStyle: (product.category === "Caps") ? null : sleeveName,
+          color: colorVal || null,
+        });
+      });
+    }
+
     // Show shell and clear loading state
     setStateMessage("");
     if (shell) shell.style.display = "grid";
