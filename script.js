@@ -33,6 +33,13 @@ const SHIRT_GRADES = [
   { name: "Stone Wash 370 GSM",     price: 30000 },
 ];
 
+// Global 10% promo discount
+const DISCOUNT_RATE = 0.10;
+const applyDiscount = (price) => {
+  const base = Number(price) || 0;
+  return Math.round(base * (1 - DISCOUNT_RATE));
+};
+
 // Return grade objects for a specific product, using stored gradePrices
 // where available, falling back to SHIRT_GRADES defaults.
 function getProductGrades(product) {
@@ -84,9 +91,10 @@ window.products = window.products || [];
 const products  = window.products;   // live reference — always reads the current array
 
 // ===================================
-// CART
+// CART — delegated to shared cart.js (window.SHGACart)
 // ===================================
-let cart = [];
+// Use a proxy reference so all cart reads/writes go through SHGACart
+const getCart = () => window.SHGACart ? window.SHGACart.getAll() : []; 
 
 // ===================================
 // SLEEVE STYLES
@@ -150,7 +158,18 @@ const cartEmptyMsg = $("cartEmptyMsg");
 // ===================================
 // UTILS
 // ===================================
-const formatPrice = (price) => `\u20a6${price.toLocaleString("en-NG")}`;
+const formatPrice = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
+
+const buildDiscountPriceHtml = (price, { prefix = "", suffix = "" } = {}) => {
+  const base = Number(price) || 0;
+  if (!base) return formatPrice(0);
+  const discounted = applyDiscount(base);
+  const prefixHtml = prefix ? `<span class="price-prefix">${prefix}</span> ` : "";
+  return (
+    `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
+    `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
+  );
+};
 
 const contrastColor = (hex) => {
   if (!hex) return "#ffffff";
@@ -163,9 +182,13 @@ const contrastColor = (hex) => {
 
 const buildSingleWaLink = (product, grade, color) => {
   const phone      = "2348134421763";
+  const basePrice  = product.type === "sleeveless"
+    ? Number(product.price || 0)
+    : Number(grade.price);
+  const discountPrice = applyDiscount(basePrice);
   const gradeInfo  = product.type === "sleeveless"
-    ? `Fixed Price: ${formatPrice(product.price || 0)}`
-    : `Shirt Grade: ${grade.name} — ${formatPrice(grade.price)}`;
+    ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
+    : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
   const sizeInfo   = (product.category !== "Caps" && state.selectedSize) ? `Size: ${state.selectedSize.label}` : "";
@@ -180,20 +203,7 @@ const buildSingleWaLink = (product, grade, color) => {
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
 };
 
-const buildCartWaLink = () => {
-  const phone = "2348134421763";
-  const lines = cart.map((item, i) =>
-    `${i + 1}. ${item.design}` +
-    (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
-    (item.size        ? ` · Size ${item.size}`          : "") +
-    (item.sleeveStyle ? ` · ${item.sleeveStyle}`        : "") +
-    (item.color       ? ` · ${item.color}`              : "") +
-    ` — ${formatPrice(item.price)} x ${item.quantity}`
-  ).join("\n");
-  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const msg   = `Hi SHGAdrip! Here's my order:\n\n${lines}\n\nTotal: ${formatPrice(total)}\n\nPlease confirm details. Thanks!`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-};
+const buildCartWaLink = () => window.SHGACart ? window.SHGACart.buildWaLink() : "#";
 
 // FIX: guard against undefined price (Firestore product before price is set)
 // Uses per-product gradePrices if available; falls back to SHIRT_GRADES defaults.
@@ -242,9 +252,11 @@ const renderProducts = () => {
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `View ${product.name}`);
 
-    const priceLabel = (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
-      ? formatPrice(effectiveMinPrice(product))
-      : `From ${formatPrice(effectiveMinPrice(product))}`;
+    const minPrice = effectiveMinPrice(product);
+    const isFixed = (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless");
+    const priceLabel = isFixed
+      ? buildDiscountPriceHtml(minPrice)
+      : buildDiscountPriceHtml(minPrice, { prefix: "From" });
 
     // Out-of-stock badge
     const outOfStock = Number(product.stock) === 0;
@@ -536,21 +548,15 @@ const closeModal = () => {
 // ===================================
 // CART
 // ===================================
+// ===================================
+// CART UI — all delegated to cart.js
+// ===================================
 const updateCartUI = () => {
-  const total = cart.reduce((s, i) => s + i.quantity, 0);
-  if (total > 0) {
-    cartCount.textContent = total;
-    cartCount.style.display = "flex";
-  } else {
-    cartCount.style.display = "none";
-  }
-  const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  cartTotal.textContent = formatPrice(totalPrice);
-  cartEmptyMsg.style.display = cart.length === 0 ? "block" : "none";
-  cartWaBtn.style.display    = cart.length > 0  ? "block" : "none";
+  if (window.SHGACart) window.SHGACart.updateBadge();
 };
 
 const addToCart = (productId, gradeIdx) => {
+  if (!window.SHGACart) return;
   const source  = window.products || [];
   const product = source.find(p => String(p.id) === String(productId));
   if (!product) return;
@@ -559,105 +565,33 @@ const addToCart = (productId, gradeIdx) => {
   const grade = product.type === "sleeveless" ? null : (productGrades[gradeIdx] || productGrades[0]);
   const price = product.type === "sleeveless" ? (product.price || 0) : (grade ? grade.price : 0);
 
-  const item = {
+  const baseUrl = window.location.origin;
+  const imageUrl = product.imageUrl || product.image || "";
+  const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(product.id)}`;
+
+  window.SHGACart.add({
     productId,
     design:     product.name,
+    imageUrl,
+    productPageUrl,
     shirtGrade: grade ? grade.name : null,
     price,
     size:        state.selectedSize   ? state.selectedSize.label   : null,
     sleeveStyle: state.selectedSleeve ? state.selectedSleeve.name  : null,
     color:       state.selectedColor  ? state.selectedColor.name   : null,
-    quantity:    1,
-  };
-
-  const key = `${productId}-${item.shirtGrade}-${item.size}-${item.sleeveStyle}-${item.color}`;
-  const existing = cart.find(c =>
-    `${c.productId}-${c.shirtGrade}-${c.size}-${c.sleeveStyle}-${c.color}` === key
-  );
-
-  if (existing) {
-    existing.quantity++;
-  } else {
-    cart.push(item);
-  }
-
-  updateCartUI();
-  showCartToast(product.name, item.shirtGrade, item.size, item.sleeveStyle, item.color, price);
+  });
 };
 
 window.changeQty = (idx, delta) => {
-  cart[idx].quantity += delta;
-  if (cart[idx].quantity <= 0) cart.splice(idx, 1);
-  updateCartUI();
-  renderCartItems();
+  if (window.SHGACart) window.SHGACart.changeQty(idx, delta);
 };
 
 window.removeFromCart = (idx) => {
-  cart.splice(idx, 1);
-  updateCartUI();
-  renderCartItems();
+  if (window.SHGACart) window.SHGACart.remove(idx);
 };
 
 const renderCartItems = () => {
-  if (cart.length === 0) { cartItems.innerHTML = ""; return; }
-  cartItems.innerHTML = cart.map((item, idx) => {
-    const colorObj   = SHIRT_COLORS.find(c => c.name === item.color);
-    const swatchStyle = colorObj
-      ? `background:${colorObj.hex};`
-      : "background:var(--grey);";
-
-    return `
-    <div class="cart-item">
-      <div class="cart-item-info">
-        <p class="cart-item-name">${item.design}</p>
-        <div class="cart-item-meta">
-          ${item.shirtGrade ? `<span class="cart-meta-badge">${item.shirtGrade}</span>` : `<span class="cart-meta-badge">Fixed</span>`}
-          ${item.size        ? `<span class="cart-meta-badge cart-meta-badge--size">${item.size}</span>` : ""}
-          ${item.sleeveStyle ? `<span class="cart-meta-badge cart-meta-badge--sleeve"><i class="${item.sleeveStyle === 'Sleeveless' ? 'fa-solid fa-person-running' : 'fa-solid fa-shirt'}"></i> ${item.sleeveStyle}</span>` : ""}
-          <span class="cart-color-dot" style="${swatchStyle}" title="${item.color}"></span>
-          <span class="cart-item-color-name">${item.color || ""}</span>
-        </div>
-        <p class="cart-item-price">${formatPrice(item.price)}</p>
-      </div>
-      <div class="cart-item-controls">
-        <button class="cart-qty-btn" onclick="changeQty(${idx},-1)">−</button>
-        <span class="cart-qty-num">${item.quantity}</span>
-        <button class="cart-qty-btn" onclick="changeQty(${idx},1)">+</button>
-        <button class="cart-remove-btn" onclick="removeFromCart(${idx})" aria-label="Remove">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-    </div>`;
-  }).join("");
-};
-
-const showCartToast = (name, grade, size, sleeve, color, price) => {
-  const existing = document.querySelector(".cart-toast");
-  if (existing) existing.remove();
-  const toast = document.createElement("div");
-  toast.className = "cart-toast";
-  toast.innerHTML = `
-    <i class="fa-solid fa-circle-check"></i>
-    <span><strong>${name}</strong>${grade ? ` · ${grade}` : ""}${size ? ` · ${size}` : ""}${sleeve ? ` · ${sleeve}` : ""}${color ? ` · ${color}` : ""} — ${formatPrice(price)}</span>`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.classList.add("visible"), 10);
-  setTimeout(() => { toast.classList.remove("visible"); setTimeout(() => toast.remove(), 300); }, 2800);
-};
-
-// ===================================
-// CART PANEL
-// ===================================
-const openCart = () => {
-  renderCartItems();
-  cartPanel.classList.add("open");
-  cartOverlay.classList.add("active");
-  document.body.style.overflow = "hidden";
-};
-
-const closeCart = () => {
-  cartPanel.classList.remove("open");
-  cartOverlay.classList.remove("active");
-  document.body.style.overflow = "";
+  if (window.SHGACart) window.SHGACart.renderItems();
 };
 
 // ===================================
@@ -691,6 +625,7 @@ const handleOrderSubmit = (e) => {
     `Hi SHGAdrip! I'd like to place an order:\n\n` +
     `Name: ${name}\nPhone: ${phone}\nSize: ${size}\n` +
     `Quality/Grade: ${quality}\nColor: ${color}\nDesign: ${design}\n\n` +
+    `Note: 10% OFF promo applies to eligible items.\n\n` +
     `Please confirm details. Thanks!`;
   window.open(`https://wa.me/2348134421763?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   orderForm.reset();
@@ -725,13 +660,15 @@ const initEvents = () => {
     closeModal();
   });
 
-  cartBtn.addEventListener("click", openCart);
-  cartOverlay.addEventListener("click", closeCart);
-  $("cartClose").addEventListener("click", closeCart);
-  cartWaBtn.addEventListener("click", () => {
-    if (cart.length === 0) return;
-    window.open(buildCartWaLink(), "_blank", "noopener");
-  });
+  if (window.SHGACart) {
+    cartBtn.addEventListener("click", window.SHGACart.open);
+    cartOverlay.addEventListener("click", window.SHGACart.close);
+    $("cartClose").addEventListener("click", window.SHGACart.close);
+    cartWaBtn.addEventListener("click", () => {
+      if (window.SHGACart && window.SHGACart.getCount() === 0) return;
+      window.open(window.SHGACart.buildWaLink(), "_blank", "noopener");
+    });
+  }
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {

@@ -27,7 +27,12 @@
   ];
 
   const fmt = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
-
+  // global promo discount (used in other scripts too)
+  const DISCOUNT_RATE = 0.10;
+  const applyDiscount = (price) => {
+    const base = Number(price || 0);
+    return Math.round(base * (1 - DISCOUNT_RATE));
+  };
   // ── Persistence ────────────────────────────────────────────────
   function load() {
     try {
@@ -78,7 +83,11 @@
     if (cartWaBtn)    cartWaBtn.style.display    = "block";
 
     const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    if (cartTotal) cartTotal.textContent = fmt(totalPrice);
+    const discountedTotal = cart.reduce((s, i) => s + applyDiscount(i.price) * i.quantity, 0);
+    if (cartTotal) cartTotal.innerHTML = `
+      <span class="price-original">${fmt(totalPrice)}</span>
+      <span class="price-discounted">${fmt(discountedTotal)}</span>
+    `;
 
     cartItems.innerHTML = cart.map((item, idx) => {
       const colorObj    = SHIRT_COLORS.find(c => c.name === item.color);
@@ -102,7 +111,10 @@
             <span class="cart-color-dot" style="${swatchStyle}" title="${item.color || ""}"></span>
             <span class="cart-item-color-name">${item.color || ""}</span>
           </div>
-          <p class="cart-item-price">${fmt(item.price)}</p>
+          <p class="cart-item-price">
+            <span class="price-original">${fmt(item.price)}</span>
+            <span class="price-discounted">${fmt(applyDiscount(item.price))}</span>
+          </p>
         </div>
         <div class="cart-item-right">
           <button class="cart-remove-btn" onclick="window.SHGACart.remove(${idx})" aria-label="Remove">
@@ -119,19 +131,29 @@
   }
 
   // ── Toast ──────────────────────────────────────────────────────
-  function showToast(name, grade, size, sleeve, color, price) {
+  // now accepts an optional imageUrl parameter so callers can show a
+  // tiny thumbnail in the notification.
+  function showToast(name, grade, size, sleeve, color, price, imageUrl) {
     const existing = document.querySelector(".cart-toast");
     if (existing) existing.remove();
     const toast = document.createElement("div");
     toast.className = "cart-toast";
+
+    // build optional image HTML (hides itself if src fails)
+    const imgHtml = imageUrl
+      ? `<img class="cart-toast-img" src="${imageUrl}" alt="${name}" loading="lazy" onerror="this.style.display='none'">`
+      : "";
+
+    const discounted = applyDiscount(price);
     toast.innerHTML =
+      imgHtml +
       `<i class="fa-solid fa-circle-check"></i>` +
       `<span><strong>${name}</strong>` +
       `${grade  ? ` · ${grade}`  : ""}` +
       `${size   ? ` · ${size}`   : ""}` +
       `${sleeve ? ` · ${sleeve}` : ""}` +
       `${color  ? ` · ${color}`  : ""}` +
-      ` — ${fmt(price)}</span>`;
+      ` — <span class="price-original">${fmt(price)}</span> <span class="price-discounted">${fmt(discounted)}</span></span>`;
     document.body.appendChild(toast);
     setTimeout(() => toast.classList.add("visible"), 10);
     setTimeout(() => {
@@ -146,27 +168,30 @@
     const baseUrl = window.location.origin;
     const lines = cart.map((item, i) => {
       const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(item.productId)}`;
-      // always send something under the "Image" label; fall back to product page
       const imgLink = item.imageUrl ? item.imageUrl : productPageUrl;
+      const lineBaseTotal = Number(item.price || 0) * item.quantity;
+      const lineDiscountTotal = applyDiscount(item.price) * item.quantity;
       return (
         `${i + 1}. ${item.design}` +
         (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
         (item.size        ? ` · Size ${item.size}`          : "") +
         (item.sleeveStyle ? ` · ${item.sleeveStyle}`        : "") +
         (item.color       ? ` · ${item.color}`              : "") +
-        ` — ${fmt(item.price)} x ${item.quantity}` +
+        ` — Original: ${fmt(lineBaseTotal)} → ${fmt(lineDiscountTotal)} (10% OFF)` +
         `\n   🖼 Image: ${imgLink}` +
         `\n   🔗 View: ${productPageUrl}`
       );
     }).join("\n\n");
-    const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    const originalTotal = cart.reduce((s, i) => s + Number(i.price || 0) * i.quantity, 0);
+    const discountedTotal = cart.reduce((s, i) => s + applyDiscount(i.price) * i.quantity, 0);
     const msg = `Hi SHGAdrip! Here's my order:
 
 ${lines}
 
-Total: ${fmt(total)}
-
-Please confirm details. Thanks!`;
+` +
+                `Cart Total (before discount): ${fmt(originalTotal)}\n` +
+                `Cart Total after 10% OFF: ${fmt(discountedTotal)}\n\n` +
+                `Please confirm details. Thanks!`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   }
 
@@ -204,7 +229,16 @@ Please confirm details. Thanks!`;
       }
       save(cart);
       updateBadge();
-      showToast(item.design, item.shirtGrade, item.size, item.sleeveStyle, item.color, item.price);
+      // pass imageUrl so the toast can show a thumbnail if available
+      showToast(
+        item.design,
+        item.shirtGrade,
+        item.size,
+        item.sleeveStyle,
+        item.color,
+        item.price,
+        item.imageUrl || item.imageUrl /* fallback same field, safe */
+      );
     },
 
     changeQty(idx, delta) {

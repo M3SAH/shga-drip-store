@@ -19,6 +19,23 @@
   const $$ = (sel) => document.querySelectorAll(sel);
   const formatPrice = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
 
+  const DISCOUNT_RATE = 0.10;
+  const applyDiscount = (price) => {
+    const base = Number(price) || 0;
+    return Math.round(base * (1 - DISCOUNT_RATE));
+  };
+
+  const buildDiscountPriceHtml = (price, { prefix = "", suffix = "" } = {}) => {
+    const base = Number(price) || 0;
+    if (!base) return formatPrice(0);
+    const discounted = applyDiscount(base);
+    const prefixHtml = prefix ? `<span class="price-prefix">${prefix}</span> ` : "";
+    return (
+      `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
+      `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
+    );
+  };
+
   const DEFAULT_GRADES = [
     { name: "Standard Pro 250 GSM", price: 16000 },
     { name: "New Premium 320 GSM", price: 22000 },
@@ -149,9 +166,10 @@
       const isFixedPrice =
         ["Caps", "Hoodies", "Sleeveless"].includes(product.category) ||
         product.type === "sleeveless";
+      const minPrice = getMinPrice(product);
       const priceLabel = isFixedPrice
-        ? formatPrice(getMinPrice(product))
-        : `From ${formatPrice(getMinPrice(product))}`;
+        ? buildDiscountPriceHtml(minPrice)
+        : buildDiscountPriceHtml(minPrice, { prefix: "From" });
 
       const stockBadge = outOfStock
         ? `<span class="card-out-of-stock-badge">Out of Stock</span>`
@@ -179,18 +197,20 @@
             <p class="card-cat">${product.category || ""}</p>
             <h3 class="card-name">${product.name || ""}</h3>
             <p class="card-price">${priceLabel}</p>
-            <span class="card-cta">${outOfStock ? "View details" : "View Product"}</span>
           </div>
         </a>
-        ${!outOfStock ? `
-        <button
-          class="card-add-to-cart-btn"
-          data-product-id="${product.id}"
-          aria-label="Add ${product.name} to cart"
-          title="Add to cart"
-        >
-          <i class="fa-solid fa-cart-plus"></i>
-        </button>` : ""}
+        ${
+          !outOfStock
+            ? `<button
+                class="card-add-to-cart-btn"
+                data-product-id="${product.id}"
+                aria-label="Add ${product.name} to cart"
+                title="Add to cart"
+              >
+                <i class="fa-solid fa-cart-plus"></i>
+              </button>`
+            : ""
+        }
       `;
 
       frag.appendChild(card);
@@ -290,10 +310,6 @@
     renderPagination(list.length);
   };
 
-  // -----------------------------
-  // Events
-  // -----------------------------
-  function initEvents() {
     // ── Add-to-cart: delegated click on the product grid ──
     if (grid) {
       grid.addEventListener("click", (e) => {
@@ -347,6 +363,11 @@
         });
 
         // Visual feedback on button
+        if (typeof window.syncCartFromCollections === "function") {
+          window.syncCartFromCollections();
+        }
+
+        // Quick visual feedback on button
         btn.innerHTML = `<i class="fa-solid fa-check"></i>`;
         btn.classList.add("added");
         setTimeout(() => {
@@ -356,6 +377,18 @@
       });
     }
 
+cts = () => {
+    const list = computeFiltered();
+    state.currentList = list;
+    state.currentPage = 1;
+    renderPage(1);
+    renderPagination(list.length);
+  };
+
+  // -----------------------------
+  // Events
+  // -----------------------------
+  function initEvents() {
     // Mobile nav (shared behavior)
     const navToggle = $("navToggle");
     const navMenu = $("navMenu");

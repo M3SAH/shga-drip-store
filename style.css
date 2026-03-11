@@ -1103,6 +1103,28 @@ textarea {
   font-weight: 600;
   color: var(--gold);
 }
+
+/* Discounted price styling (original crossed out, new price highlighted) */
+.price-prefix {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--white-dim);
+  margin-right: 0.25rem;
+}
+.price-original {
+  text-decoration: line-through;
+  color: var(--white-dim);
+  opacity: 0.7;
+  margin-right: 0.35rem;
+  font-size: 0.88em;
+}
+.price-discounted {
+  color: var(--gold);
+  font-weight: 700;
+}
+
 .card-cta {
   margin-top: 0.75rem;
   font-size: 0.75rem;
@@ -2531,6 +2553,16 @@ textarea {
   color: var(--gold);
   flex-shrink: 0;
 }
+
+/* thumbnail inside toast */
+.cart-toast-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 .cart-toast.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
