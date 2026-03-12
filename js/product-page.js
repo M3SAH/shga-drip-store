@@ -80,6 +80,9 @@
       ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
       : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
 
+    const imageUrl = product.imageUrl || product.image || "";
+    const productPageUrl = `${window.location.origin}/product.html?id=${encodeURIComponent(product.id)}`;
+
     const msg =
       `Hi SHGAdrip! I'd like to order:\n\n` +
       `Design: ${product.name}\n` +
@@ -87,6 +90,8 @@
       `${sleeve ? `Sleeve Style: ${sleeve}\n` : ""}` +
       `${size ? `Size: ${size}\n` : ""}` +
       `${color ? `Color: ${color}\n` : ""}` +
+      (imageUrl ? `\n🖼 Product Image: ${imageUrl}` : "") +
+      `\n🔗 Product Page: ${productPageUrl}` +
       `\nPlease confirm availability and delivery details. Thanks!`;
 
     return `https://wa.me/${BUSINESS_WA}?text=${encodeURIComponent(msg)}`;
