@@ -10,6 +10,8 @@
   const $$ = (sel) => document.querySelectorAll(sel);
   const formatPrice = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
 
+  const isDiscountEnabled = () => localStorage.getItem("discountEnabled") !== "false";
+
   const DISCOUNT_RATE = 0.10;
   const applyDiscount = (price) => {
     const base = Number(price) || 0;
@@ -19,6 +21,9 @@
   const buildDiscountPriceHtml = (price, { suffix = "" } = {}) => {
     const base = Number(price) || 0;
     if (!base) return formatPrice(0);
+    if (!isDiscountEnabled()) {
+      return `<span class="price-current">${formatPrice(base)}${suffix}</span>`;
+    }
     const discounted = applyDiscount(base);
     return (
       `<span class="price-original">${formatPrice(base)}</span>` +
@@ -76,9 +81,16 @@
       : (grade?.price || DEFAULT_GRADES[0].price);
     const basePrice = Number(basePriceRaw) || 0;
     const discountPrice = applyDiscount(basePrice);
-    const gradeInfo = (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
-      ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
-      : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+    const gradeInfo = (() => {
+      if (!isDiscountEnabled()) {
+        return (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
+          ? `Fixed Price: ${formatPrice(basePrice)}`
+          : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)}`;
+      }
+      return (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
+        ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
+        : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+    })();
 
     const imageUrl = product.imageUrl || product.image || "";
     const productPageUrl = `${window.location.origin}/product.html?id=${encodeURIComponent(product.id)}`;
@@ -137,6 +149,9 @@
   }
 
   function renderProductPage() {
+    document.querySelectorAll(".promo-banner").forEach((el) => {
+      el.style.display = isDiscountEnabled() ? "" : "none";
+    });
     const id = productIdFromUrl();
     const shell = $("productShell");
 

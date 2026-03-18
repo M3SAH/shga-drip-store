@@ -20,6 +20,8 @@
 
 // Import reviews functionality
 import { initPublicReviews } from "./js/reviews.js";
+import { CONFIG } from "./js/config.js";
+import { applyDiscount, formatPrice } from "./js/utils/pricing.js";
 
 // ===================================
 // SHIRT GRADE / QUALITY TIERS
@@ -33,11 +35,10 @@ const SHIRT_GRADES = [
   { name: "Stone Wash 370 GSM",     price: 30000 },
 ];
 
-// Global 10% promo discount
-const DISCOUNT_RATE = 0.10;
-const applyDiscount = (price) => {
-  const base = Number(price) || 0;
-  return Math.round(base * (1 - DISCOUNT_RATE));
+const hideOrShowPromoUi = () => {
+  document.querySelectorAll(".promo-banner").forEach((el) => {
+    el.style.display = CONFIG.discountEnabled ? "" : "none";
+  });
 };
 
 // Return grade objects for a specific product, using stored gradePrices
@@ -158,13 +159,14 @@ const cartEmptyMsg = $("cartEmptyMsg");
 // ===================================
 // UTILS
 // ===================================
-const formatPrice = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
-
 const buildDiscountPriceHtml = (price, { prefix = "", suffix = "" } = {}) => {
   const base = Number(price) || 0;
   if (!base) return formatPrice(0);
-  const discounted = applyDiscount(base);
   const prefixHtml = prefix ? `<span class="price-prefix">${prefix}</span> ` : "";
+  if (!CONFIG.discountEnabled) {
+    return `${prefixHtml}<span class="price-current">${formatPrice(base)}${suffix}</span>`;
+  }
+  const discounted = applyDiscount(base, CONFIG.discountEnabled);
   return (
     `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
     `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
@@ -185,10 +187,17 @@ const buildSingleWaLink = (product, grade, color) => {
   const basePrice  = product.type === "sleeveless"
     ? Number(product.price || 0)
     : Number(grade.price);
-  const discountPrice = applyDiscount(basePrice);
-  const gradeInfo  = product.type === "sleeveless"
-    ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
-    : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+  const discountPrice = applyDiscount(basePrice, CONFIG.discountEnabled);
+  const gradeInfo  = (() => {
+    if (!CONFIG.discountEnabled) {
+      return product.type === "sleeveless"
+        ? `Fixed Price: ${formatPrice(basePrice)}`
+        : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)}`;
+    }
+    return product.type === "sleeveless"
+      ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
+      : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+  })();
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
   const sizeInfo   = (product.category !== "Caps" && state.selectedSize) ? `Size: ${state.selectedSize.label}` : "";
@@ -216,6 +225,13 @@ const effectiveMinPrice = (p) => {
   return Math.min(...grades.map(g => g.price));
 };
 const isFeaturedProduct = (product) => Boolean(product && product.isFeatured);
+const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
+const normalizeCategory = (cat) => {
+  const raw = String(cat || "");
+  const c = raw === "Unisex" ? "T-Shirts" : raw;
+  if (!c) return "Others";
+  return KNOWN_CATEGORIES.includes(c) ? c : "Others";
+};
 
 // ===================================
 // RENDER PRODUCT GRID
@@ -224,7 +240,10 @@ const isFeaturedProduct = (product) => Boolean(product && product.isFeatured);
 // ===================================
 const renderProducts = () => {
   // Always read from the live window.products array
-  const source   = (window.products || []).filter(isFeaturedProduct);
+  const source   = (window.products || [])
+    .map((p) => (p ? { ...p, category: normalizeCategory(p.category) } : p))
+    .filter(isFeaturedProduct)
+    .slice(0, 12);
   const filtered = source.filter((p) => {
     const catMatch   = state.activeCategory === "all" || p.category === state.activeCategory;
     const priceMatch = effectiveMinPrice(p) <= state.maxPrice;
@@ -625,7 +644,7 @@ const handleOrderSubmit = (e) => {
     `Hi SHGAdrip! I'd like to place an order:\n\n` +
     `Name: ${name}\nPhone: ${phone}\nSize: ${size}\n` +
     `Quality/Grade: ${quality}\nColor: ${color}\nDesign: ${design}\n\n` +
-    `Note: 10% OFF promo applies to eligible items.\n\n` +
+    (CONFIG.discountEnabled ? `Note: 10% OFF promo applies to eligible items.\n\n` : "") +
     `Please confirm details. Thanks!`;
   window.open(`https://wa.me/2348134421763?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   orderForm.reset();
@@ -739,6 +758,7 @@ const initObserver = () => {
 //      empty grid before Firebase responds.
 // ===================================
 const init = () => {
+  hideOrShowPromoUi();
   updateCartUI();
   initEvents();
   initObserver();

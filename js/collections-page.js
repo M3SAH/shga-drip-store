@@ -11,6 +11,8 @@
   // Config
   // -----------------------------
   const PAGE_SIZE = 20;
+  const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
+  const isDiscountEnabled = () => localStorage.getItem("discountEnabled") !== "false";
 
   // -----------------------------
   // Helpers
@@ -28,8 +30,11 @@
   const buildDiscountPriceHtml = (price, { prefix = "", suffix = "" } = {}) => {
     const base = Number(price) || 0;
     if (!base) return formatPrice(0);
-    const discounted = applyDiscount(base);
     const prefixHtml = prefix ? `<span class="price-prefix">${prefix}</span> ` : "";
+    if (!isDiscountEnabled()) {
+      return `${prefixHtml}<span class="price-current">${formatPrice(base)}${suffix}</span>`;
+    }
+    const discounted = applyDiscount(base);
     return (
       `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
       `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
@@ -97,6 +102,9 @@
   const paginationContainer = $("paginationContainer");
 
   if (!grid) return;
+  document.querySelectorAll(".promo-banner").forEach((el) => {
+    el.style.display = isDiscountEnabled() ? "" : "none";
+  });
 
   // -----------------------------
   // Render
@@ -106,7 +114,11 @@
     const q = normalizeText(state.search);
 
     const filtered = source.filter((p) => {
-      const catMatch = state.activeCategory === "all" || p.category === state.activeCategory;
+      const rawCat = String(p?.category || "");
+      const normalizedCat = rawCat === "Unisex" ? "T-Shirts" : (KNOWN_CATEGORIES.includes(rawCat) ? rawCat : "Others");
+      if (p && p.category !== normalizedCat) p.category = normalizedCat;
+
+      const catMatch = state.activeCategory === "all" || normalizedCat === state.activeCategory;
       const priceMatch = getMinPrice(p) <= state.maxPrice;
       const searchMatch = !q || normalizeText(p.name).includes(q) || normalizeText(p.description).includes(q);
       return catMatch && priceMatch && searchMatch;

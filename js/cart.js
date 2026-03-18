@@ -11,6 +11,7 @@
 
 (() => {
   const STORAGE_KEY = "shgadrip_cart_v1";
+  const isDiscountEnabled = () => localStorage.getItem("discountEnabled") !== "false";
 
   const SHIRT_COLORS = [
     { id: "white",      name: "White",      hex: "#FFFFFF" },
@@ -31,6 +32,7 @@
   const DISCOUNT_RATE = 0.10;
   const applyDiscount = (price) => {
     const base = Number(price || 0);
+    if (!isDiscountEnabled()) return base;
     return Math.round(base * (1 - DISCOUNT_RATE));
   };
   // ── Persistence ────────────────────────────────────────────────
@@ -84,10 +86,12 @@
 
     const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
     const discountedTotal = cart.reduce((s, i) => s + applyDiscount(i.price) * i.quantity, 0);
-    if (cartTotal) cartTotal.innerHTML = `
-      <span class="price-original">${fmt(totalPrice)}</span>
-      <span class="price-discounted">${fmt(discountedTotal)}</span>
-    `;
+    if (cartTotal) {
+      cartTotal.innerHTML = isDiscountEnabled()
+        ? `<span class="price-original">${fmt(totalPrice)}</span>
+           <span class="price-discounted">${fmt(discountedTotal)}</span>`
+        : `<span class="price-current">${fmt(totalPrice)}</span>`;
+    }
 
     cartItems.innerHTML = cart.map((item, idx) => {
       const colorObj    = SHIRT_COLORS.find(c => c.name === item.color);
@@ -112,8 +116,12 @@
             <span class="cart-item-color-name">${item.color || ""}</span>
           </div>
           <p class="cart-item-price">
-            <span class="price-original">${fmt(item.price)}</span>
-            <span class="price-discounted">${fmt(applyDiscount(item.price))}</span>
+            ${
+              isDiscountEnabled()
+                ? `<span class="price-original">${fmt(item.price)}</span>
+                   <span class="price-discounted">${fmt(applyDiscount(item.price))}</span>`
+                : `<span class="price-current">${fmt(item.price)}</span>`
+            }
           </p>
         </div>
         <div class="cart-item-right">
@@ -153,7 +161,9 @@
       `${size   ? ` · ${size}`   : ""}` +
       `${sleeve ? ` · ${sleeve}` : ""}` +
       `${color  ? ` · ${color}`  : ""}` +
-      ` — <span class="price-original">${fmt(price)}</span> <span class="price-discounted">${fmt(discounted)}</span></span>`;
+      (isDiscountEnabled()
+        ? ` — <span class="price-original">${fmt(price)}</span> <span class="price-discounted">${fmt(discounted)}</span></span>`
+        : ` — <span class="price-current">${fmt(price)}</span></span>`);
     document.body.appendChild(toast);
     setTimeout(() => toast.classList.add("visible"), 10);
     setTimeout(() => {

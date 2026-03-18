@@ -51,11 +51,15 @@ function toProduct(docSnap) {
       : Number(d.createdAt) || 0;
   // Support both field names: `imageUrl` (admin panel) and `image` (alias)
   const resolvedImageUrl = d.imageUrl || d.image || "";
+  const rawCategory = d.category || "T-Shirts";
+  const normalizedCategory = rawCategory === "Unisex" ? "T-Shirts" : rawCategory;
+  const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
+  const category = KNOWN_CATEGORIES.includes(normalizedCategory) ? normalizedCategory : "Others";
   return {
     id:          docSnap.id,
     name:        d.name        || "Untitled",
     description: d.description || "",
-    category:    d.category    || "Unisex",
+    category,
     price:       Number(d.price)  || 0,
     stock:       Number(d.stock)  || 0,
     gsm:         d.gsm        || "",
@@ -70,11 +74,11 @@ function toProduct(docSnap) {
     image:       resolvedImageUrl,
     imageUrl:    resolvedImageUrl,
     type:
-      d.category === "Sleeveless" || d.type === "sleeveless"
+      category === "Sleeveless" || d.type === "sleeveless"
         ? "sleeveless"
-        : d.category === "Hoodies"
+        : category === "Hoodies"
         ? "hoodie"
-        : d.category === "Caps"
+        : category === "Caps"
         ? "cap"
         : "design",
   };

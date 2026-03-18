@@ -32,11 +32,13 @@ import {
 import {
   collection, addDoc, doc,
   updateDoc, deleteDoc, query, orderBy,
-  serverTimestamp, onSnapshot, limit
+  serverTimestamp, onSnapshot, limit, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Import reviews functionality
 import { initAdminReviews, saveAdminReview } from "../js/reviews.js";
+
+import { CONFIG, setDiscountEnabled } from "../js/config.js";
 
 // NOTE: Firebase Storage is intentionally NOT used here.
 // Product images are hosted on Cloudinary and referenced by HTTPS URLs
@@ -92,6 +94,15 @@ function requireAuth() {
    DOM SETUP  — called only after auth confirmed
 ══════════════════════════════════════════════ */
 function initAdminUI() {
+  /* ── Global discount toggle ── */
+  const discountToggle = document.getElementById("discountToggle");
+  if (discountToggle) {
+    discountToggle.checked = Boolean(CONFIG.discountEnabled);
+    discountToggle.addEventListener("change", () => {
+      setDiscountEnabled(discountToggle.checked, { persist: true });
+      toast(`Discount ${CONFIG.discountEnabled ? "enabled" : "disabled"} globally.`, "info", 2200);
+    });
+  }
 
   /* ── Logout ── */
   document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -439,15 +450,40 @@ async function handleAdd() {
   const isFeatured = document.getElementById("a-featured")?.checked || false;
 
   const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
+  const isOthers = cat === "Others";
+
+  if (!cat)            return toast("Please select a category.", "error");
+  if (isOthers) {
+    const fixedPrice = parseFloat(val("a-fixed-price")) || 0;
+    if (fixedPrice <= 0) return toast("Please enter a price.", "error");
+    const btn = document.getElementById("addBtn");
+    setBtnLoading(btn, true);
+    try {
+      await addDoc(collection(db, "products"), {
+        name: name || "Untitled",
+        category: "Others",
+        price: fixedPrice,
+        imageUrl: imageUrl || "",
+        image: imageUrl || "",
+        createdAt: serverTimestamp(),
+      });
+      toast(`"${name || "Untitled"}" added successfully!`, "success");
+      resetAddForm();
+      switchView("manage");
+    } catch (err) {
+      console.error(err);
+      toast(`Failed to add product: ${err.message}`, "error");
+    } finally {
+      setBtnLoading(btn, false, '<i class="fa-solid fa-plus"></i> Add Product');
+    }
+    return;
+  }
 
   if (!name)           return toast("Product name is required.", "error");
-  if (!cat)            return toast("Please select a category.", "error");
   if (!isCaps && !sizes.length)   return toast("Please select at least one size.", "error");
   if (!colors.length)  return toast("Please select at least one color.", "error");
   if (!imageUrl)       return toast("Please upload a product image using the Upload Image button.", "error");
-  if (!isCloudinaryUrl(imageUrl)) {
-    return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
-  }
+  if (!isCloudinaryUrl(imageUrl)) return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
 
   let gradePrices = {};
   let minPrice = 0;
@@ -637,8 +673,45 @@ async function handleSaveEdit() {
   const isFeatured = document.getElementById("e-featured")?.checked || false;
 
   const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
+  const isOthers = cat === "Others";
   let gradePrices = {};
   let minPrice = 0;
+
+  if (isOthers) {
+    const fixedPrice = parseFloat(val("e-fixed-price")) || 0;
+    if (fixedPrice <= 0) return toast("Please enter a price.", "error");
+    const btn = document.getElementById("editSave");
+    setBtnLoading(btn, true);
+    try {
+      const updates = {
+        name: name || "Untitled",
+        category: "Others",
+        price: fixedPrice,
+        description: deleteField(),
+        grades: deleteField(),
+        grade: deleteField(),
+        gradePrices: deleteField(),
+        stock: deleteField(),
+        sizes: deleteField(),
+        colors: deleteField(),
+        hasSleeveless: deleteField(),
+        isFeatured: deleteField(),
+      };
+      if (newUrl) {
+        updates.imageUrl = newUrl;
+        updates.image = newUrl;
+      }
+      await updateDoc(doc(db, "products", state.editId), updates);
+      toast("Product updated successfully!", "success");
+      closeEditModal();
+    } catch (err) {
+      console.error(err);
+      toast(`Failed to save changes: ${err.message}`, "error");
+    } finally {
+      setBtnLoading(btn, false, '<i class="fa-solid fa-floppy-disk"></i> Save Changes');
+    }
+    return;
+  }
 
   if (isFixedPriceCat) {
     const fixedPrice = parseFloat(val("e-fixed-price")) || 0;
@@ -952,7 +1025,8 @@ const FIXED_PRICE_BY_CAT = {
 function togglePricingUI(form) {
   const isAdd = form === "add";
   const cat = val(isAdd ? "a-cat" : "e-cat");
-  const useFixed = FIXED_PRICE_CATS.includes(cat);
+  const isOthers = cat === "Others";
+  const useFixed = isOthers || FIXED_PRICE_CATS.includes(cat);
 
   const fixedWrap = document.getElementById(isAdd ? "a-fixed-price-wrap" : "e-fixed-price-wrap");
   const gradesWrap = document.getElementById(isAdd ? "a-grades-wrap" : "e-grades-wrap");
@@ -966,11 +1040,17 @@ function togglePricingUI(form) {
   const isCaps = cat === "Caps";
   const sizesWrap = document.getElementById(isAdd ? "a-sizes-wrap" : "e-sizes-wrap");
   const sleevelessWrap = document.getElementById(isAdd ? "a-sleeveless-wrap" : "e-sleeveless-wrap");
-  if (sizesWrap) sizesWrap.style.display = isCaps ? "none" : "block";
-  if (sleevelessWrap) sleevelessWrap.style.display = isCaps ? "none" : "block";
+  if (sizesWrap) sizesWrap.style.display = (isCaps || isOthers) ? "none" : "block";
+  if (sleevelessWrap) sleevelessWrap.style.display = (isCaps || isOthers) ? "none" : "block";
+
+  const colorsWrap = document.getElementById(isAdd ? "a-colors" : "e-colors")?.closest(".fg.span2");
+  if (colorsWrap) colorsWrap.style.display = isOthers ? "none" : "block";
+
+  const stockInput = document.getElementById(isAdd ? "a-stock" : "e-stock")?.closest(".fg");
+  if (stockInput) stockInput.style.display = isOthers ? "none" : "block";
 
   // Auto-fill fixed price for Caps/Hoodies (only if empty)
-  if (useFixed) {
+  if (useFixed && !isOthers) {
     const fixedInput = document.getElementById(isAdd ? "a-fixed-price" : "e-fixed-price");
     if (fixedInput && !String(fixedInput.value || "").trim() && FIXED_PRICE_BY_CAT[cat]) {
       fixedInput.value = String(FIXED_PRICE_BY_CAT[cat]);

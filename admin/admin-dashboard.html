@@ -1878,6 +1878,23 @@
             </div>
           </div>
           <div class="topbar-right">
+            <label
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.35rem 0.75rem;
+                background: var(--surface2);
+                border: 1px solid var(--border2);
+                border-radius: var(--radius);
+                font-size: 0.72rem;
+                color: var(--muted);
+                user-select: none;
+              "
+            >
+              <input id="discountToggle" type="checkbox" style="accent-color: var(--gold)" />
+              <span>Enable 10% Discount</span>
+            </label>
             <div class="topbar-badge">
               <div class="online-dot"></div>
               <span>Live</span>
@@ -1949,10 +1966,11 @@
                   <label>Category *</label>
                   <select id="a-cat">
                     <option value="">Select category…</option>
-                    <option value="Unisex">Unisex</option>
+                    <option value="T-Shirts">T-Shirts</option>
                     <option value="Sleeveless">Sleeveless</option>
                     <option value="Hoodies">Hoodies</option>
                     <option value="Caps">Caps</option>
+                    <option value="Others">Others</option>
                   </select>
                 </div>
 
@@ -2232,10 +2250,11 @@
                 </div>
                 <select class="filter-select" id="catFilter">
                   <option value="">All Categories</option>
-                  <option value="Unisex">Unisex</option>
+                  <option value="T-Shirts">T-Shirts</option>
                   <option value="Sleeveless">Sleeveless</option>
                   <option value="Hoodies">Hoodies</option>
                   <option value="Caps">Caps</option>
+                  <option value="Others">Others</option>
                 </select>
                 <div class="toolbar-right" id="prodCount">—</div>
               </div>
@@ -2348,10 +2367,11 @@
             <div class="fg">
               <label>Category</label>
               <select id="e-cat">
-                <option value="Unisex">Unisex</option>
+                <option value="T-Shirts">T-Shirts</option>
                 <option value="Sleeveless">Sleeveless</option>
                 <option value="Hoodies">Hoodies</option>
                 <option value="Caps">Caps</option>
+                <option value="Others">Others</option>
               </select>
             </div>
             <!-- Fixed price for Caps / Hoodies (edit) -->
