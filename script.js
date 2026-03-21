@@ -13,56 +13,32 @@
  *     static call racing with (and overwriting) the Firebase response.
  *     The initial skeleton grid is shown by products.js instead.
  *
- *  4. effectiveMinPrice() now falls back gracefully when product.price
- *     is undefined (Firebase products may not have a price yet).
+ *  4. Listing prices use product.price only; missing prices show as
+ *     unavailable (shared helpers in js/utils/pricing.js).
  * ─────────────────────────────────────────────────────────────────
  */
 
 // Import reviews functionality
 import { initPublicReviews } from "./js/reviews.js";
 import { CONFIG } from "./js/config.js";
-import { applyDiscount, formatPrice } from "./js/utils/pricing.js";
-
-// ===================================
-// SHIRT GRADE / QUALITY TIERS
-// Base fallback prices used when a product has no gradePrices saved.
-// When a product HAS gradePrices, those override these per-product.
-// ===================================
-const SHIRT_GRADES = [
-  { name: "Standard Pro 250 GSM",   price: 16000 },
-  { name: "New Premium 320 GSM",    price: 22000 },
-  { name: "Prime 350 GSM",          price: 28000 },
-  { name: "Stone Wash 370 GSM",     price: 30000 },
-];
+import {
+  applyDiscount,
+  formatPrice,
+  parseProductPrice,
+  getGradePriceOptions,
+  resolveLinePrice,
+  pricePassesMaxFilter,
+  buildStorefrontPriceHtml,
+  isOthersProduct,
+  buildOthersWhatsAppUrl,
+  isDiscountActiveForProduct,
+} from "./js/utils/pricing.js";
 
 const hideOrShowPromoUi = () => {
   document.querySelectorAll(".promo-banner").forEach((el) => {
     el.style.display = CONFIG.discountEnabled ? "" : "none";
   });
 };
-
-// Return grade objects for a specific product, using stored gradePrices
-// where available, falling back to SHIRT_GRADES defaults.
-function getProductGrades(product) {
-  if (product.category === "Caps") {
-    return [{ name: "Fixed Price", price: 10000 }];
-  }
-  if (product.category === "Hoodies") {
-    return [{ name: "Fixed Price", price: 30000 }];
-  }
-  const savedNames = Array.isArray(product.grades) && product.grades.length
-    ? product.grades
-    : (product.grade ? [product.grade] : SHIRT_GRADES.map(g => g.name));
-
-  return SHIRT_GRADES
-    .filter(g => savedNames.includes(g.name))
-    .map(g => ({
-      name:  g.name,
-      price: (product.gradePrices && product.gradePrices[g.name])
-             ? Number(product.gradePrices[g.name])
-             : g.price
-    }));
-}
 
 // ===================================
 // COLOR CATALOG
@@ -119,7 +95,7 @@ const SHIRT_SIZES = [
 const state = {
   activeCategory: "all",
   maxPrice:       50000,
-  selectedGrade:  SHIRT_GRADES[0],
+  selectedGrade:  null,
   selectedColor:  SHIRT_COLORS[0],
   selectedSleeve: SLEEVE_STYLES[0],
   selectedSize:   SHIRT_SIZES[3],   // default: XL
@@ -159,19 +135,18 @@ const cartEmptyMsg = $("cartEmptyMsg");
 // ===================================
 // UTILS
 // ===================================
-const buildDiscountPriceHtml = (price, { prefix = "", suffix = "" } = {}) => {
-  const base = Number(price) || 0;
-  if (!base) return formatPrice(0);
-  const prefixHtml = prefix ? `<span class="price-prefix">${prefix}</span> ` : "";
-  if (!CONFIG.discountEnabled) {
-    return `${prefixHtml}<span class="price-current">${formatPrice(base)}${suffix}</span>`;
-  }
-  const discounted = applyDiscount(base, CONFIG.discountEnabled);
-  return (
-    `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
-    `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
-  );
-};
+const buildDiscountPriceHtml = (price, opts = {}, product = null) =>
+  buildStorefrontPriceHtml(price, {
+    ...opts,
+    discountEnabled: isDiscountActiveForProduct(product, CONFIG.discountEnabled),
+  });
+
+const escapeHtml = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const contrastColor = (hex) => {
   if (!hex) return "#ffffff";
@@ -184,19 +159,22 @@ const contrastColor = (hex) => {
 
 const buildSingleWaLink = (product, grade, color) => {
   const phone      = "2348134421763";
-  const basePrice  = product.type === "sleeveless"
-    ? Number(product.price || 0)
-    : Number(grade.price);
-  const discountPrice = applyDiscount(basePrice, CONFIG.discountEnabled);
+  const basePrice  = resolveLinePrice(product, grade);
+  const baseNum    = basePrice == null ? null : Number(basePrice);
+  const promoOn    = isDiscountActiveForProduct(product, CONFIG.discountEnabled);
+  const discountPrice = baseNum != null ? applyDiscount(baseNum, promoOn) : null;
+  const priceLabel = baseNum == null ? "Price unavailable" : formatPrice(baseNum);
+  const discLabel  = discountPrice != null ? formatPrice(discountPrice) : "";
   const gradeInfo  = (() => {
-    if (!CONFIG.discountEnabled) {
-      return product.type === "sleeveless"
-        ? `Fixed Price: ${formatPrice(basePrice)}`
-        : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)}`;
+    if (baseNum == null) return "Price: unavailable — please confirm with seller";
+    if (!promoOn) {
+      return grade
+        ? `Shirt Grade: ${grade.name} — ${priceLabel}`
+        : `Price: ${priceLabel}`;
     }
-    return product.type === "sleeveless"
-      ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
-      : `Shirt Grade: ${grade.name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+    return grade
+      ? `Shirt Grade: ${grade.name} — ${priceLabel} → ${discLabel} (10% OFF)`
+      : `Price: ${priceLabel} → ${discLabel} (10% OFF)`;
   })();
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
@@ -214,16 +192,6 @@ const buildSingleWaLink = (product, grade, color) => {
 
 const buildCartWaLink = () => window.SHGACart ? window.SHGACart.buildWaLink() : "#";
 
-// FIX: guard against undefined price (Firestore product before price is set)
-// Uses per-product gradePrices if available; falls back to SHIRT_GRADES defaults.
-const effectiveMinPrice = (p) => {
-  if (p.category === "Caps") return 10000;
-  if (p.category === "Hoodies") return 30000;
-  if (p.type === "sleeveless") return Number(p.price) || 0;
-  const grades = getProductGrades(p);
-  if (!grades.length) return SHIRT_GRADES[0].price;
-  return Math.min(...grades.map(g => g.price));
-};
 const isFeaturedProduct = (product) => Boolean(product && product.isFeatured);
 const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
 const normalizeCategory = (cat) => {
@@ -246,7 +214,7 @@ const renderProducts = () => {
     .slice(0, 12);
   const filtered = source.filter((p) => {
     const catMatch   = state.activeCategory === "all" || p.category === state.activeCategory;
-    const priceMatch = effectiveMinPrice(p) <= state.maxPrice;
+    const priceMatch = pricePassesMaxFilter(p, state.maxPrice);
     return catMatch && priceMatch;
   });
 
@@ -271,17 +239,25 @@ const renderProducts = () => {
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `View ${product.name}`);
 
-    const minPrice = effectiveMinPrice(product);
-    const isFixed = (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless");
-    const priceLabel = isFixed
-      ? buildDiscountPriceHtml(minPrice)
-      : buildDiscountPriceHtml(minPrice, { prefix: "From" });
+    const listPrice = parseProductPrice(product);
+    const priceLabel = buildDiscountPriceHtml(listPrice, {}, product);
 
-    // Out-of-stock badge
-    const outOfStock = Number(product.stock) === 0;
+    const others = isOthersProduct(product);
+    const outOfStock = !others && Number(product.stock) === 0;
     const stockBadge = outOfStock
       ? `<span class="card-out-of-stock-badge">Out of Stock</span>`
       : "";
+
+    const othersColorsLine =
+      others &&
+      Array.isArray(product.colors) &&
+      product.colors.length
+        ? product.colors.map((c) => escapeHtml(c)).join(" · ")
+        : "";
+
+    const ctaText = others
+      ? "Order via WhatsApp"
+      : (outOfStock ? "Unavailable" : "Choose Grade &amp; Color");
 
     card.innerHTML = `
       <div class="card-image">
@@ -292,8 +268,13 @@ const renderProducts = () => {
       <div class="card-body">
         <p class="card-cat">${product.category}</p>
         <h3 class="card-name">${product.name}</h3>
+        ${
+          othersColorsLine
+            ? `<p class="card-others-colors">${othersColorsLine}</p>`
+            : ""
+        }
         <p class="card-price">${priceLabel}</p>
-        <span class="card-cta">${outOfStock ? "Unavailable" : "Choose Grade &amp; Color"}</span>
+        <span class="card-cta">${ctaText}</span>
       </div>`;
 
     if (!outOfStock) {
@@ -314,27 +295,35 @@ window.renderProducts = renderProducts;
 
 // ===================================
 // MODAL – Grade Selector
-// Only shows grades the admin enabled for this product.
-// Each grade button displays the price the admin set for that grade.
-// Falls back to SHIRT_GRADES defaults for legacy products.
+// Only when product.gradePrices exists (per-grade prices from admin).
 // ===================================
 const renderGradeSelector = (product) => {
   const wrap = $("gradeSelector");
+  const section = document.querySelector("#productModal .grade-selector-section");
   if (!wrap) return;
 
-  if (product.type === "sleeveless") {
-    wrap.innerHTML = `
-      <div class="grade-fixed-notice">
-        <i class="fa-solid fa-tag"></i>
-        Fixed price — no grade selection needed
-      </div>`;
+  if (isOthersProduct(product)) {
+    if (section) section.style.display = "none";
+    state.selectedGrade = null;
+    wrap.innerHTML = "";
     return;
   }
 
-  // Get grades with per-product prices
-  const grades = getProductGrades(product);
-  const toShow  = grades.length ? grades : SHIRT_GRADES;
+  if (product.type === "sleeveless") {
+    if (section) section.style.display = "none";
+    state.selectedGrade = null;
+    return;
+  }
 
+  const toShow = getGradePriceOptions(product);
+  if (!toShow.length) {
+    if (section) section.style.display = "none";
+    state.selectedGrade = null;
+    wrap.innerHTML = "";
+    return;
+  }
+
+  if (section) section.style.display = "block";
   state.selectedGrade = toShow[0];
 
   wrap.innerHTML = toShow.map((g, idx) => `
@@ -345,7 +334,7 @@ const renderGradeSelector = (product) => {
     </button>`
   ).join("");
 
-  $("modalAddToCart").dataset.gradeIdx = idx_of(toShow[0], toShow);
+  $("modalAddToCart").dataset.gradeIdx = String(idx_of(toShow[0], toShow));
 
   wrap.querySelectorAll(".grade-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -355,9 +344,10 @@ const renderGradeSelector = (product) => {
       wrap.querySelectorAll(".grade-btn").forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
       btn.classList.add("active");
       btn.setAttribute("aria-pressed", "true");
-      $("modalPrice").textContent = formatPrice(grade.price);
+      const line = resolveLinePrice(product, grade);
+      $("modalPrice").innerHTML = buildDiscountPriceHtml(line, { suffix: " / shirt" }, product);
       $("modalWaLink").href = buildSingleWaLink(product, grade, state.selectedColor);
-      $("modalAddToCart").dataset.gradeIdx = idx_of(grade, toShow);
+      $("modalAddToCart").dataset.gradeIdx = String(idx_of(grade, toShow));
     });
   });
 };
@@ -367,14 +357,18 @@ function idx_of(grade, arr) { return arr.findIndex(g => g.name === grade.name); 
 
 // ===================================
 // MODAL – Size Selector
-// Only shows sizes the admin enabled for this product.
-// Falls back to all sizes for legacy products.
+// Only shows sizes from product.sizes; hidden when none (except Caps).
 // ===================================
 const renderSizeSelector = (product) => {
   const wrap = $("sizeSelector");
   if (!wrap) return;
 
   const section = wrap.closest(".size-selector-section");
+  if (isOthersProduct(product)) {
+    if (section) section.style.display = "none";
+    state.selectedSize = null;
+    return;
+  }
   if (product.category === "Caps") {
     if (section) section.style.display = "none";
     state.selectedSize = null;
@@ -391,9 +385,19 @@ const renderSizeSelector = (product) => {
 
   const savedLabels = Array.isArray(product.sizes) && product.sizes.length
     ? product.sizes.map(normalize)
-    : SHIRT_SIZES.map(s => s.label);
+    : [];
+  if (!savedLabels.length) {
+    if (section) section.style.display = "none";
+    state.selectedSize = null;
+    return;
+  }
   const toShow = SHIRT_SIZES.filter(s => savedLabels.includes(s.label));
-  const sizes  = toShow.length ? toShow : SHIRT_SIZES;
+  const sizes  = toShow.length ? toShow : [];
+  if (!sizes.length) {
+    if (section) section.style.display = "none";
+    state.selectedSize = null;
+    return;
+  }
 
   state.selectedSize = sizes[0];
 
@@ -427,6 +431,12 @@ const renderSleeveSelector = (product) => {
   if (!wrap) return;
 
   const section = wrap.closest(".sleeve-selector-section");
+
+  if (isOthersProduct(product)) {
+    if (section) section.style.display = "none";
+    state.selectedSleeve = SLEEVE_STYLES[0];
+    return;
+  }
 
   // Show sleeve selector if product has sleeveless option
   const showSleeve = product.category !== "Caps" && (product.hasSleeveless || product.type === "sleeveless");
@@ -463,17 +473,51 @@ const renderSleeveSelector = (product) => {
 
 // ===================================
 // MODAL – Color Selector
-// Only shows colors the admin enabled for this product.
-// Falls back to all colors for legacy products.
+// Only shows colors from product.colors; section hidden when empty.
+// "Others" uses the same swatches when names match the catalog; otherwise a simple text list.
 // ===================================
 const renderColorSelector = (product) => {
   const container = $("colorSelectorWrap");
+  const section = container?.closest(".color-selector-section");
   if (!container) return;
 
   const savedNames = Array.isArray(product.colors) && product.colors.length
-    ? product.colors : SHIRT_COLORS.map(c => c.name);
+    ? product.colors
+    : [];
+  if (!savedNames.length) {
+    if (section) section.style.display = "none";
+    state.selectedColor = null;
+    container.innerHTML = "";
+    return;
+  }
+  if (section) section.style.display = "block";
+
   const toShow = SHIRT_COLORS.filter(c => savedNames.includes(c.name));
-  const colors = toShow.length ? toShow : SHIRT_COLORS;
+  let colors = toShow.length ? toShow : [];
+
+  if (!colors.length) {
+    if (isOthersProduct(product)) {
+      container.innerHTML = `
+        <div class="color-group">
+          <p class="color-group-label">Colors</p>
+          <p class="others-colors-text">${savedNames.map(escapeHtml).join(", ")}</p>
+        </div>`;
+      state.selectedColor = {
+        id: "others-text",
+        name: savedNames[0],
+        hex: "#666666",
+        group: "Colors",
+      };
+      updateColorDisplay();
+      const wa = $("modalWaLink");
+      if (wa) wa.href = buildOthersWhatsAppUrl(product, savedNames[0]);
+      return;
+    }
+    if (section) section.style.display = "none";
+    state.selectedColor = null;
+    container.innerHTML = "";
+    return;
+  }
 
   state.selectedColor = colors[0];
 
@@ -512,9 +556,20 @@ const renderColorSelector = (product) => {
       swatch.classList.add("active");
       swatch.setAttribute("aria-pressed","true");
       updateColorDisplay();
-      $("modalWaLink").href = buildSingleWaLink(product, state.selectedGrade, state.selectedColor);
+      const wa = $("modalWaLink");
+      if (!wa) return;
+      wa.href = isOthersProduct(product)
+        ? buildOthersWhatsAppUrl(product, color.name)
+        : buildSingleWaLink(product, state.selectedGrade, state.selectedColor);
     });
   });
+
+  const wa = $("modalWaLink");
+  if (wa) {
+    wa.href = isOthersProduct(product)
+      ? buildOthersWhatsAppUrl(product, state.selectedColor?.name || null)
+      : buildSingleWaLink(product, state.selectedGrade, state.selectedColor);
+  }
 };
 
 function updateColorDisplay() {
@@ -529,30 +584,95 @@ function updateColorDisplay() {
 // ===================================
 // MODAL OPEN / CLOSE
 // ===================================
-const openModal = (product) => {
-  state.openProduct = product;
+function resetProductModalChrome() {
+  [".grade-selector-section", ".size-selector-section", ".sleeve-selector-section", ".color-selector-section"].forEach((sel) => {
+    const el = document.querySelector(`#productModal ${sel}`);
+    if (el) el.style.removeProperty("display");
+  });
+  const addBtn = $("modalAddToCart");
+  if (addBtn) {
+    addBtn.style.display = "";
+    addBtn.disabled = false;
+    addBtn.style.removeProperty("opacity");
+  }
+  const wa = $("modalWaLink");
+  if (wa) {
+    wa.innerHTML = `<i class="fa-brands fa-whatsapp"></i> Order Now`;
+    wa.style.removeProperty("pointer-events");
+    wa.style.removeProperty("opacity");
+  }
+}
 
-  // Resolve the first grade available for this specific product (with its price)
-  const available = getProductGrades(product);
-  state.selectedGrade = (available.length ? available : SHIRT_GRADES)[0];
+function openOthersModal(product) {
+  state.selectedGrade = null;
+  state.selectedSize = null;
+  state.selectedColor = null;
+  state.selectedSleeve = SLEEVE_STYLES[0];
+
+  [".grade-selector-section", ".size-selector-section", ".sleeve-selector-section"].forEach((sel) => {
+    const el = document.querySelector(`#productModal ${sel}`);
+    if (el) el.style.display = "none";
+  });
+
+  renderColorSelector(product);
+
+  const listPrice = parseProductPrice(product);
+  $("modalPrice").innerHTML = buildDiscountPriceHtml(listPrice, {}, product);
+
+  const wa = $("modalWaLink");
+  if (wa) {
+    wa.href = buildOthersWhatsAppUrl(product, state.selectedColor?.name || null);
+    wa.innerHTML = `<i class="fa-brands fa-whatsapp"></i> Order via WhatsApp`;
+    wa.style.removeProperty("pointer-events");
+    wa.style.removeProperty("opacity");
+  }
+
+  const addBtn = $("modalAddToCart");
+  if (addBtn) {
+    addBtn.style.display = "none";
+    addBtn.disabled = true;
+  }
+}
+
+const openModal = (product) => {
+  resetProductModalChrome();
+  state.openProduct = product;
 
   modalImg.src           = product.image || product.imageUrl || "";
   modalImg.alt           = product.name;
   modalCat.textContent   = product.category;
   modalTitle.textContent = product.name;
   modalDesc.textContent  = product.description || "";
-  modalPrice.textContent = product.type === "sleeveless"
-    ? formatPrice(product.price || 0)
-    : formatPrice(state.selectedGrade.price);
+
+  if (isOthersProduct(product)) {
+    openOthersModal(product);
+    modal.classList.add("active");
+    document.body.style.overflow = "hidden";
+    return;
+  }
 
   renderGradeSelector(product);
   renderSizeSelector(product);
   renderSleeveSelector(product);
   renderColorSelector(product);
 
+  const gradeOpts = getGradePriceOptions(product);
+  const linePrice = resolveLinePrice(product, state.selectedGrade);
+  $("modalPrice").innerHTML = buildDiscountPriceHtml(linePrice, {
+    suffix: product.type === "sleeveless" ? "" : " / shirt",
+  }, product);
+
   $("modalAddToCart").dataset.productId = product.id;
-  $("modalAddToCart").dataset.gradeIdx  = 0;
+  $("modalAddToCart").dataset.gradeIdx  = state.selectedGrade ? String(idx_of(state.selectedGrade, gradeOpts)) : "0";
   $("modalWaLink").href = buildSingleWaLink(product, state.selectedGrade, state.selectedColor);
+
+  const addBtn = $("modalAddToCart");
+  const oos = Number(product.stock) === 0;
+  const noPrice = linePrice == null;
+  if (addBtn) {
+    addBtn.disabled = oos || noPrice;
+    addBtn.style.opacity = oos || noPrice ? "0.5" : "";
+  }
 
   modal.classList.add("active");
   document.body.style.overflow = "hidden";
@@ -562,6 +682,7 @@ const closeModal = () => {
   modal.classList.remove("active");
   document.body.style.overflow = "";
   state.openProduct = null;
+  resetProductModalChrome();
 };
 
 // ===================================
@@ -579,10 +700,15 @@ const addToCart = (productId, gradeIdx) => {
   const source  = window.products || [];
   const product = source.find(p => String(p.id) === String(productId));
   if (!product) return;
+  if (isOthersProduct(product)) return;
+  if (Number(product.stock) === 0) return;
 
-  const productGrades = getProductGrades(product);
-  const grade = product.type === "sleeveless" ? null : (productGrades[gradeIdx] || productGrades[0]);
-  const price = product.type === "sleeveless" ? (product.price || 0) : (grade ? grade.price : 0);
+  const productGrades = getGradePriceOptions(product);
+  const grade = product.type === "sleeveless"
+    ? null
+    : (productGrades[gradeIdx] || productGrades[0] || null);
+  const price = resolveLinePrice(product, grade);
+  if (price == null) return;
 
   const baseUrl = window.location.origin;
   const imageUrl = product.imageUrl || product.image || "";
@@ -595,6 +721,7 @@ const addToCart = (productId, gradeIdx) => {
     productPageUrl,
     shirtGrade: grade ? grade.name : null,
     price,
+    category:   product.category || null,
     size:        state.selectedSize   ? state.selectedSize.label   : null,
     sleeveStyle: state.selectedSleeve ? state.selectedSleeve.name  : null,
     color:       state.selectedColor  ? state.selectedColor.name   : null,
@@ -673,8 +800,10 @@ const initEvents = () => {
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
   $("modalAddToCart").addEventListener("click", () => {
-    const productId = $("modalAddToCart").dataset.productId; // keep as string (Firebase doc ID)
-    const gradeIdx  = parseInt($("modalAddToCart").dataset.gradeIdx || "0", 10);
+    const addBtn = $("modalAddToCart");
+    if (addBtn?.disabled) return;
+    const productId = addBtn.dataset.productId;
+    const gradeIdx  = parseInt(addBtn.dataset.gradeIdx || "0", 10);
     addToCart(productId, gradeIdx);
     closeModal();
   });
@@ -693,7 +822,7 @@ const initEvents = () => {
     if (e.key === "Escape") {
       if (modal.classList.contains("active")) closeModal();
       if (navMenu.classList.contains("open")) closeNav();
-      if (cartPanel.classList.contains("open")) closeCart();
+      if (cartPanel.classList.contains("open") && window.SHGACart) window.SHGACart.close();
     }
   });
 

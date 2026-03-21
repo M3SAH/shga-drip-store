@@ -1945,20 +1945,22 @@
             <div class="form-card">
               <div class="form-grid">
                 <div class="fg span2">
-                  <label>Product Name *</label>
+                  <label>Product name *</label>
                   <input
                     type="text"
                     id="a-name"
                     placeholder="e.g. USA Hustle Graphic Tee"
+                    required
                   />
                 </div>
 
                 <div class="fg span2">
-                  <label>Description</label>
+                  <label>Description *</label>
                   <textarea
                     id="a-desc"
                     rows="3"
                     placeholder="Describe the product…"
+                    required
                   ></textarea>
                 </div>
 
@@ -1974,15 +1976,21 @@
                   </select>
                 </div>
 
-                <!-- Fixed price for Caps / Hoodies -->
-                <div class="fg span2" id="a-fixed-price-wrap" style="display: none;">
+                <div class="fg">
                   <label>Price (₦) *</label>
-                  <input type="number" id="a-fixed-price" placeholder="e.g. 10000" min="0" step="100"
-                    style="max-width: 180px;" />
-                  <small
-                    style="font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; display: block;">
-                    Caps and Hoodies use a single fixed price.
-                  </small>
+                  <input
+                    type="number"
+                    id="a-price"
+                    placeholder="e.g. 18500"
+                    min="0"
+                    step="100"
+                    required
+                  />
+                </div>
+
+                <div class="fg" id="a-stock-wrap">
+                  <label>Stock Quantity *</label>
+                  <input type="number" id="a-stock" placeholder="50" min="0" required />
                 </div>
 
                 <div class="fg span2" id="a-grades-wrap">
@@ -2020,8 +2028,9 @@
                       display: block;
                     "
                   >
-                    Set a price for each selected grade. The lowest price will
-                    show as "Starts from" on the storefront.
+                    Optional: per-grade prices for the product page only when
+                    these are set. The main <strong>Price</strong> field above is
+                    what the store uses for listings and as the default.
                   </small>
                 </div>
 
@@ -2058,7 +2067,7 @@
                 </div>
 
                 <!-- Featured option -->
-                <div class="fg span2">
+                <div class="fg span2" id="a-featured-wrap">
                   <label>Featured Item</label>
                   <label
                     class="chip"
@@ -2086,11 +2095,6 @@
                   >
                     Featured items appear on the homepage showcase section.
                   </small>
-                </div>
-
-                <div class="fg">
-                  <label>Stock Quantity *</label>
-                  <input type="number" id="a-stock" placeholder="50" min="0" />
                 </div>
 
                 <div class="fg span2" id="a-sizes-wrap">
@@ -2361,7 +2365,7 @@
               <input type="text" id="e-name" />
             </div>
             <div class="fg span2">
-              <label>Description</label>
+              <label>Description *</label>
               <textarea id="e-desc" rows="3"></textarea>
             </div>
             <div class="fg">
@@ -2374,15 +2378,9 @@
                 <option value="Others">Others</option>
               </select>
             </div>
-            <!-- Fixed price for Caps / Hoodies (edit) -->
-            <div class="fg span2" id="e-fixed-price-wrap" style="display: none;">
+            <div class="fg">
               <label>Price (₦) *</label>
-              <input type="number" id="e-fixed-price" placeholder="e.g. 10000" min="0" step="100"
-                style="max-width: 180px;" />
-              <small
-                style="font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; display: block;">
-                Caps and Hoodies use a single fixed price.
-              </small>
+              <input type="number" id="e-price" min="0" step="100" />
             </div>
 
             <div class="fg span2" id="e-grades-wrap">
@@ -2418,8 +2416,9 @@
                   display: block;
                 "
               >
-                Set a price for each selected grade. The lowest price will show
-                as "Starts from" on the storefront.
+                Optional per-grade prices (product page only). The main
+                <strong>Price</strong> field is used for listings and as the
+                default.
               </small>
             </div>
 
@@ -2452,7 +2451,7 @@
             </div>
 
             <!-- Featured option (edit modal) -->
-            <div class="fg span2">
+            <div class="fg span2" id="e-featured-wrap">
               <label>Featured Item</label>
               <label
                 class="chip"
@@ -2478,8 +2477,8 @@
               </small>
             </div>
 
-            <div class="fg">
-              <label>Stock Quantity</label>
+            <div class="fg" id="e-stock-wrap">
+              <label>Stock Quantity *</label>
               <input type="number" id="e-stock" min="0" />
             </div>
 

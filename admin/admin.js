@@ -39,6 +39,7 @@ import {
 import { initAdminReviews, saveAdminReview } from "../js/reviews.js";
 
 import { CONFIG, setDiscountEnabled } from "../js/config.js";
+import { PRICE_UNAVAILABLE_TEXT } from "../js/utils/pricing.js";
 
 // NOTE: Firebase Storage is intentionally NOT used here.
 // Product images are hosted on Cloudinary and referenced by HTTPS URLs
@@ -149,6 +150,7 @@ function initAdminUI() {
   initSleevelessChip("a-sleeveless");
   initFeaturedChip("a-featured");
   initAddFormCategoryToggle();
+  togglePricingUI("add");
   document.getElementById("addBtn").addEventListener("click",   handleAdd);
   document.getElementById("resetBtn").addEventListener("click", resetAddForm);
 
@@ -241,9 +243,10 @@ function initRealtimeListener() {
 function renderStats() {
   const p       = state.products;
   const total   = p.length;
-  const inStock = p.filter(x => (x.stock || 0) > 5).length;
-  const low     = p.filter(x => (x.stock || 0) > 0 && (x.stock || 0) <= 5).length;
-  const out     = p.filter(x => (x.stock || 0) === 0).length;
+  const isStd   = (x) => (x.category || "") !== "Others";
+  const inStock = p.filter(x => isStd(x) && (x.stock || 0) > 5).length;
+  const low     = p.filter(x => isStd(x) && (x.stock || 0) > 0 && (x.stock || 0) <= 5).length;
+  const out     = p.filter(x => isStd(x) && (x.stock || 0) === 0).length;
 
   const cards = [
     { cls: "gold",   icon: "fa-boxes-stacked",        val: total,   lbl: "Total Products" },
@@ -367,8 +370,15 @@ function buildTable(items) {
       ? `<img class="thumb" src="${esc(imgSrc)}" alt="${esc(p.name)}" loading="lazy"/>`
       : `<div class="thumb-placeholder"><i class="fa-solid fa-shirt"></i></div>`;
 
-    const price  = p.price ? `₦${Number(p.price).toLocaleString("en-NG")}` : "—";
-    const badge  = stockBadge(p.stock);
+    const pNum =
+      p.price != null && p.price !== "" && Number.isFinite(Number(p.price))
+        ? Number(p.price)
+        : null;
+    const price =
+      pNum != null ? `₦${pNum.toLocaleString("en-NG")}` : PRICE_UNAVAILABLE_TEXT;
+    const badge  = (p.category || "") === "Others"
+      ? `<span class="badge" style="opacity:.55">—</span>`
+      : stockBadge(p.stock);
     const featuredTag = (p.isFeatured || p.featured)
       ? `<span class="tag">Featured</span>`
       : "";
@@ -437,37 +447,46 @@ function emptyState(icon, title, sub) {
 async function handleAdd() {
   if (!requireAuth()) return;
 
-  const name  = val("a-name");
-  const desc  = val("a-desc");
+  const name  = val("a-name").trim();
+  const desc  = val("a-desc").trim();
   const cat   = val("a-cat");
-  const stock = parseInt(val("a-stock"))   || 0;
+  const priceNum = parseFloat(val("a-price"));
+  const stock = parseInt(val("a-stock"), 10);
   let grades   = getChecked("a-grades");
   const isCaps = cat === "Caps";
-  const sizes    = isCaps ? [] : getChecked("a-sizes");
+  const isOthers = cat === "Others";
+  const sizes    = isCaps || isOthers ? [] : getChecked("a-sizes");
   const colors   = getChecked("a-colors");
   const imageUrl = val("a-image-url").trim();
-  const hasSleeveless = isCaps ? false : (document.getElementById("a-sleeveless")?.checked || false);
+  const hasSleeveless = isCaps || isOthers ? false : (document.getElementById("a-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("a-featured")?.checked || false;
 
-  const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
-  const isOthers = cat === "Others";
+  if (!cat) return toast("Please select a category.", "error");
+  if (!name) return toast("Product name is required.", "error");
+  if (!desc) return toast("Description is required.", "error");
+  if (!Number.isFinite(priceNum) || priceNum <= 0) {
+    return toast("Please enter a valid price greater than zero.", "error");
+  }
 
-  if (!cat)            return toast("Please select a category.", "error");
   if (isOthers) {
-    const fixedPrice = parseFloat(val("a-fixed-price")) || 0;
-    if (fixedPrice <= 0) return toast("Please enter a price.", "error");
+    if (!colors.length) return toast("Please select at least one color.", "error");
+    if (!imageUrl) return toast("Please upload a product image using the Upload Image button.", "error");
+    if (!isCloudinaryUrl(imageUrl)) {
+      return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+    }
     const btn = document.getElementById("addBtn");
     setBtnLoading(btn, true);
     try {
       await addDoc(collection(db, "products"), {
-        name: name || "Untitled",
+        name,
+        description: desc,
+        price: priceNum,
+        imageUrl,
         category: "Others",
-        price: fixedPrice,
-        imageUrl: imageUrl || "",
-        image: imageUrl || "",
+        colors,
         createdAt: serverTimestamp(),
       });
-      toast(`"${name || "Untitled"}" added successfully!`, "success");
+      toast(`"${name}" added successfully!`, "success");
       resetAddForm();
       switchView("manage");
     } catch (err) {
@@ -479,44 +498,45 @@ async function handleAdd() {
     return;
   }
 
-  if (!name)           return toast("Product name is required.", "error");
-  if (!isCaps && !sizes.length)   return toast("Please select at least one size.", "error");
-  if (!colors.length)  return toast("Please select at least one color.", "error");
-  if (!imageUrl)       return toast("Please upload a product image using the Upload Image button.", "error");
-  if (!isCloudinaryUrl(imageUrl)) return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+  if (!Number.isFinite(stock) || stock < 0) {
+    return toast("Please enter a valid stock quantity (0 or more).", "error");
+  }
 
-  let gradePrices = {};
-  let minPrice = 0;
+  if (!isCaps && !sizes.length) return toast("Please select at least one size.", "error");
+  if (!colors.length) return toast("Please select at least one color.", "error");
 
-  if (isFixedPriceCat) {
-    const fixedPrice = parseFloat(val("a-fixed-price")) || 0;
-    if (fixedPrice <= 0) return toast("Please enter a price for Caps/Hoodies.", "error");
-    grades = ["Fixed Price"];
-    gradePrices = { "Fixed Price": fixedPrice };
-    minPrice = fixedPrice;
-  } else {
-    gradePrices = getGradePrices("a-grade-prices", grades);
-    if (!grades.length)  return toast("Please select at least one grade.", "error");
-    for (const grade of grades) {
-      if (!gradePrices[grade] || gradePrices[grade] <= 0) {
-        return toast(`Please enter a price for the "${grade}" grade.`, "error");
+  if (!imageUrl) return toast("Please upload a product image using the Upload Image button.", "error");
+  if (!isCloudinaryUrl(imageUrl)) {
+    return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+  }
+
+  const showGradeUi = cat === "T-Shirts" || cat === "Sleeveless";
+  let gradePrices = null;
+  if (showGradeUi) {
+    grades = getChecked("a-grades");
+    if (grades.length) {
+      gradePrices = getGradePrices("a-grade-prices", grades);
+      for (const grade of grades) {
+        if (!gradePrices[grade] || gradePrices[grade] <= 0) {
+          return toast(`Please enter a price for the "${grade}" grade, or unselect that grade.`, "error");
+        }
       }
+    } else {
+      grades = [];
     }
-    minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
+  } else {
+    grades = [];
   }
 
   const btn = document.getElementById("addBtn");
   setBtnLoading(btn, true);
 
   try {
-    await addDoc(collection(db, "products"), {
+    const docData = {
       name,
       description: desc,
-      category:    cat,
-      grades,
-      grade:       grades[0],
-      gradePrices,          // e.g. { Standard: 16000, Premium: 22000 }
-      price:       minPrice, // lowest — used for card display & filtering
+      category: cat,
+      price: priceNum,
       stock,
       sizes,
       colors,
@@ -524,8 +544,15 @@ async function handleAdd() {
       isFeatured,
       imageUrl,
       image: imageUrl,
-      createdAt: serverTimestamp()
-    });
+      createdAt: serverTimestamp(),
+    };
+    if (showGradeUi && grades.length && gradePrices) {
+      docData.grades = grades;
+      docData.grade = grades[0];
+      docData.gradePrices = gradePrices;
+    }
+
+    await addDoc(collection(db, "products"), docData);
 
     toast(`"${name}" added successfully!`, "success");
     resetAddForm();
@@ -540,7 +567,7 @@ async function handleAdd() {
 }
 
 function resetAddForm() {
-  ["a-name","a-desc","a-stock","a-fixed-price"].forEach(id => set(id, ""));
+  ["a-name", "a-desc", "a-stock", "a-price"].forEach(id => set(id, ""));
   set("a-cat", "");
   set("a-image-url", "");
   togglePricingUI("add");
@@ -590,23 +617,47 @@ function openEditModal(docId) {
 
   set("e-name",  p.name        || "");
   set("e-desc",  p.description || "");
-  set("e-price", p.price       || "");
-  set("e-stock", p.stock       || "");
+  const ep =
+    p.price != null && p.price !== "" && Number.isFinite(Number(p.price))
+      ? String(p.price)
+      : "";
+  set("e-price", ep);
+  set("e-stock", p.stock !== undefined && p.stock !== null ? String(p.stock) : "");
   set("e-cat",   p.category    || "Unisex");
   set("e-image-url", p.imageUrl || p.image || "");
-  set("e-fixed-price", p.price || "");
 
-  const isFixedPriceCat = FIXED_PRICE_CATS.includes(p.category || "");
-  if (!isFixedPriceCat) {
+  if ((p.category || "") === "Others") {
+    set("e-stock", "");
+    document.querySelectorAll("#e-colors .chip input[type=checkbox]").forEach(cb => {
+      cb.checked = (p.colors || []).includes(cb.value);
+      cb.closest(".chip").classList.toggle("checked", cb.checked);
+    });
+    syncAllChip("e-colors");
+    togglePricingUI("edit");
+    updateImageUrlPreview("e-image-url", "e-preview", "e-preview-wrap");
+    document.getElementById("editOverlay").classList.add("open");
+    document.body.style.overflow = "hidden";
+    return;
+  }
+
+  const showGradeUi = (p.category || "") === "T-Shirts" || (p.category || "") === "Sleeveless";
+  if (showGradeUi) {
     const savedGrades = Array.isArray(p.grades) && p.grades.length
       ? p.grades
-      : (p.grade ? [p.grade] : ["New Premium 320 GSM"]);
+      : (p.grade ? [p.grade] : []);
     document.querySelectorAll("#e-grades .chip input[type=checkbox]").forEach(cb => {
       cb.checked = savedGrades.includes(cb.value);
       cb.closest(".chip").classList.toggle("checked", cb.checked);
     });
     syncAllChip("e-grades");
     renderGradePriceInputs("e-grades", "e-grade-prices", p.gradePrices || {});
+  } else {
+    document.querySelectorAll("#e-grades .chip input[type=checkbox]").forEach(cb => {
+      cb.checked = false;
+      cb.closest(".chip").classList.remove("checked");
+    });
+    syncAllChip("e-grades");
+    renderGradePriceInputs("e-grades", "e-grade-prices", {});
   }
   togglePricingUI("edit");
 
@@ -660,47 +711,57 @@ async function handleSaveEdit() {
   if (!requireAuth()) return;
   if (!state.editId) return;
 
-  const name  = val("e-name");
-  const desc  = val("e-desc");
+  const name  = val("e-name").trim();
+  const desc  = val("e-desc").trim();
   const cat   = val("e-cat");
-  const stock = parseInt(val("e-stock"))   || 0;
+  const priceNum = parseFloat(val("e-price"));
+  const stock = parseInt(val("e-stock"), 10);
   let grades   = getChecked("e-grades");
   const isCaps = cat === "Caps";
-  const sizes    = isCaps ? [] : getChecked("e-sizes");
+  const isOthers = cat === "Others";
+  const sizes    = isCaps || isOthers ? [] : getChecked("e-sizes");
   const colors   = getChecked("e-colors");
   const newUrl   = val("e-image-url").trim();
-  const hasSleeveless = isCaps ? false : (document.getElementById("e-sleeveless")?.checked || false);
+  const hasSleeveless = isCaps || isOthers ? false : (document.getElementById("e-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("e-featured")?.checked || false;
 
-  const isFixedPriceCat = FIXED_PRICE_CATS.includes(cat);
-  const isOthers = cat === "Others";
-  let gradePrices = {};
-  let minPrice = 0;
+  if (!name) return toast("Product name is required.", "error");
+  if (!desc) return toast("Description is required.", "error");
+  if (!Number.isFinite(priceNum) || priceNum <= 0) {
+    return toast("Please enter a valid price greater than zero.", "error");
+  }
 
   if (isOthers) {
-    const fixedPrice = parseFloat(val("e-fixed-price")) || 0;
-    if (fixedPrice <= 0) return toast("Please enter a price.", "error");
+    if (!colors.length) return toast("Please select at least one color.", "error");
+    const existing = state.products.find(x => x.id === state.editId);
+    const keepUrl = (existing?.imageUrl || existing?.image || "").trim();
+    const finalUrl = (newUrl || keepUrl).trim();
+    if (!finalUrl) return toast("Please upload a product image.", "error");
+    if (newUrl && !isCloudinaryUrl(newUrl)) {
+      return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+    }
+
     const btn = document.getElementById("editSave");
     setBtnLoading(btn, true);
     try {
       const updates = {
-        name: name || "Untitled",
+        name,
+        description: desc,
+        price: priceNum,
         category: "Others",
-        price: fixedPrice,
-        description: deleteField(),
+        colors,
+        imageUrl: newUrl || keepUrl,
+        sizes: deleteField(),
         grades: deleteField(),
         grade: deleteField(),
         gradePrices: deleteField(),
         stock: deleteField(),
-        sizes: deleteField(),
-        colors: deleteField(),
         hasSleeveless: deleteField(),
         isFeatured: deleteField(),
+        image: deleteField(),
+        type: deleteField(),
+        gsm: deleteField(),
       };
-      if (newUrl) {
-        updates.imageUrl = newUrl;
-        updates.image = newUrl;
-      }
       await updateDoc(doc(db, "products", state.editId), updates);
       toast("Product updated successfully!", "success");
       closeEditModal();
@@ -713,28 +774,33 @@ async function handleSaveEdit() {
     return;
   }
 
-  if (isFixedPriceCat) {
-    const fixedPrice = parseFloat(val("e-fixed-price")) || 0;
-    if (fixedPrice <= 0) return toast("Please enter a price for Caps/Hoodies.", "error");
-    grades = ["Fixed Price"];
-    gradePrices = { "Fixed Price": fixedPrice };
-    minPrice = fixedPrice;
-  } else {
-    gradePrices = getGradePrices("e-grade-prices", grades);
-    if (!grades.length) return toast("Please select at least one grade.", "error");
-    for (const grade of grades) {
-      if (!gradePrices[grade] || gradePrices[grade] <= 0) {
-        return toast(`Please enter a price for the "${grade}" grade.`, "error");
-      }
-    }
-    minPrice = Math.min(...grades.map(g => gradePrices[g] || 0));
+  if (!Number.isFinite(stock) || stock < 0) {
+    return toast("Please enter a valid stock quantity (0 or more).", "error");
   }
 
-  if (!name)          return toast("Product name is required.", "error");
-  if (!isCaps && !sizes.length)  return toast("Please select at least one size.", "error");
+  if (!isCaps && !sizes.length) return toast("Please select at least one size.", "error");
   if (!colors.length) return toast("Please select at least one color.", "error");
+
   if (newUrl && !isCloudinaryUrl(newUrl)) {
     return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+  }
+
+  const showGradeUi = cat === "T-Shirts" || cat === "Sleeveless";
+  let gradePrices = null;
+  if (showGradeUi) {
+    grades = getChecked("e-grades");
+    if (grades.length) {
+      gradePrices = getGradePrices("e-grade-prices", grades);
+      for (const grade of grades) {
+        if (!gradePrices[grade] || gradePrices[grade] <= 0) {
+          return toast(`Please enter a price for the "${grade}" grade, or unselect that grade.`, "error");
+        }
+      }
+    } else {
+      grades = [];
+    }
+  } else {
+    grades = [];
   }
 
   const btn = document.getElementById("editSave");
@@ -745,16 +811,23 @@ async function handleSaveEdit() {
       name,
       description: desc,
       category: cat,
-      grades,
-      grade: grades[0],
-      gradePrices,
-      price: minPrice,
+      price: priceNum,
       stock,
       sizes,
       colors,
       hasSleeveless,
-      isFeatured
+      isFeatured,
     };
+
+    if (showGradeUi && grades.length && gradePrices) {
+      updates.grades = grades;
+      updates.grade = grades[0];
+      updates.gradePrices = gradePrices;
+    } else {
+      updates.grades = deleteField();
+      updates.grade = deleteField();
+      updates.gradePrices = deleteField();
+    }
 
     if (newUrl) {
       updates.imageUrl = newUrl;
@@ -1014,29 +1087,20 @@ function initReviewsUpload() {
 }
 
 /* ══════════════════════════════════════════════
-   CATEGORY TOGGLE — show shirt grades vs fixed price (Caps/Hoodies)
+   CATEGORY TOGGLE — grades only for T-Shirts / Sleeveless
 ══════════════════════════════════════════════ */
-const FIXED_PRICE_CATS = ["Caps", "Hoodies"];
-const FIXED_PRICE_BY_CAT = {
-  Caps: 10000,
-  Hoodies: 30000,
-};
-
 function togglePricingUI(form) {
   const isAdd = form === "add";
   const cat = val(isAdd ? "a-cat" : "e-cat");
   const isOthers = cat === "Others";
-  const useFixed = isOthers || FIXED_PRICE_CATS.includes(cat);
+  const showGrades = cat === "T-Shirts" || cat === "Sleeveless";
 
-  const fixedWrap = document.getElementById(isAdd ? "a-fixed-price-wrap" : "e-fixed-price-wrap");
   const gradesWrap = document.getElementById(isAdd ? "a-grades-wrap" : "e-grades-wrap");
   const gradePricesWrap = document.getElementById(isAdd ? "a-grade-prices-wrap" : "e-grade-prices-wrap");
 
-  if (fixedWrap) fixedWrap.style.display = useFixed ? "block" : "none";
-  if (gradesWrap) gradesWrap.style.display = useFixed ? "none" : "block";
-  if (gradePricesWrap) gradePricesWrap.style.display = useFixed ? "none" : "block";
+  if (gradesWrap) gradesWrap.style.display = showGrades ? "block" : "none";
+  if (gradePricesWrap) gradePricesWrap.style.display = showGrades ? "block" : "none";
 
-  // Caps: no sizes & no sleeve options
   const isCaps = cat === "Caps";
   const sizesWrap = document.getElementById(isAdd ? "a-sizes-wrap" : "e-sizes-wrap");
   const sleevelessWrap = document.getElementById(isAdd ? "a-sleeveless-wrap" : "e-sleeveless-wrap");
@@ -1044,18 +1108,12 @@ function togglePricingUI(form) {
   if (sleevelessWrap) sleevelessWrap.style.display = (isCaps || isOthers) ? "none" : "block";
 
   const colorsWrap = document.getElementById(isAdd ? "a-colors" : "e-colors")?.closest(".fg.span2");
-  if (colorsWrap) colorsWrap.style.display = isOthers ? "none" : "block";
+  if (colorsWrap) colorsWrap.style.display = "block";
 
-  const stockInput = document.getElementById(isAdd ? "a-stock" : "e-stock")?.closest(".fg");
-  if (stockInput) stockInput.style.display = isOthers ? "none" : "block";
-
-  // Auto-fill fixed price for Caps/Hoodies (only if empty)
-  if (useFixed && !isOthers) {
-    const fixedInput = document.getElementById(isAdd ? "a-fixed-price" : "e-fixed-price");
-    if (fixedInput && !String(fixedInput.value || "").trim() && FIXED_PRICE_BY_CAT[cat]) {
-      fixedInput.value = String(FIXED_PRICE_BY_CAT[cat]);
-    }
-  }
+  const stockWrap = document.getElementById(isAdd ? "a-stock-wrap" : "e-stock-wrap");
+  const featWrap = document.getElementById(isAdd ? "a-featured-wrap" : "e-featured-wrap");
+  if (stockWrap) stockWrap.style.display = isOthers ? "none" : "block";
+  if (featWrap) featWrap.style.display = isOthers ? "none" : "block";
 }
 
 function initAddFormCategoryToggle() {
@@ -1076,8 +1134,6 @@ function initEditFormCategoryToggle() {
    selection changes. Also watches on first call.
 ══════════════════════════════════════════════ */
 
-const GRADE_ORDER = ["Standard Pro 250 GSM", "New Premium 320 GSM", "Prime 350 GSM", "Stone Wash 370 GSM"];
-
 function renderGradePriceInputs(gradesContainerId, priceContainerId, existingPrices = {}) {
   const container  = document.getElementById(priceContainerId);
   if (!container) return;
@@ -1097,7 +1153,7 @@ function renderGradePriceInputs(gradesContainerId, priceContainerId, existingPri
           type="number"
           data-grade="${grade}"
           class="grade-price-input"
-          placeholder="e.g. ${GRADE_ORDER.indexOf(grade) === 0 ? 16000 : GRADE_ORDER.indexOf(grade) === 1 ? 22000 : GRADE_ORDER.indexOf(grade) === 2 ? 28000 : 30000}"
+          placeholder="Enter price (₦)"
           min="0"
           value="${existing}"
         />

@@ -30,11 +30,15 @@
   const fmt = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
   // global promo discount (used in other scripts too)
   const DISCOUNT_RATE = 0.10;
+  const isOthersItem = (item) => String(item?.category || "") === "Others";
   const applyDiscount = (price) => {
     const base = Number(price || 0);
     if (!isDiscountEnabled()) return base;
     return Math.round(base * (1 - DISCOUNT_RATE));
   };
+  /** Unit price after promo (Others items never discounted). */
+  const unitPriceForCart = (item) =>
+    isOthersItem(item) ? Number(item.price || 0) : applyDiscount(item.price);
   // ── Persistence ────────────────────────────────────────────────
   function load() {
     try {
@@ -85,12 +89,14 @@
     if (cartWaBtn)    cartWaBtn.style.display    = "block";
 
     const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    const discountedTotal = cart.reduce((s, i) => s + applyDiscount(i.price) * i.quantity, 0);
+    const discountedTotal = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
+    const hasEligiblePromo =
+      isDiscountEnabled() && cart.some((i) => !isOthersItem(i));
     if (cartTotal) {
-      cartTotal.innerHTML = isDiscountEnabled()
+      cartTotal.innerHTML = hasEligiblePromo
         ? `<span class="price-original">${fmt(totalPrice)}</span>
            <span class="price-discounted">${fmt(discountedTotal)}</span>`
-        : `<span class="price-current">${fmt(totalPrice)}</span>`;
+        : `<span class="price-current">${fmt(discountedTotal)}</span>`;
     }
 
     cartItems.innerHTML = cart.map((item, idx) => {
@@ -117,7 +123,7 @@
           </div>
           <p class="cart-item-price">
             ${
-              isDiscountEnabled()
+              isDiscountEnabled() && !isOthersItem(item)
                 ? `<span class="price-original">${fmt(item.price)}</span>
                    <span class="price-discounted">${fmt(applyDiscount(item.price))}</span>`
                 : `<span class="price-current">${fmt(item.price)}</span>`
@@ -141,7 +147,7 @@
   // ── Toast ──────────────────────────────────────────────────────
   // now accepts an optional imageUrl parameter so callers can show a
   // tiny thumbnail in the notification.
-  function showToast(name, grade, size, sleeve, color, price, imageUrl) {
+  function showToast(name, grade, size, sleeve, color, price, imageUrl, category) {
     const existing = document.querySelector(".cart-toast");
     if (existing) existing.remove();
     const toast = document.createElement("div");
@@ -152,6 +158,7 @@
       ? `<img class="cart-toast-img" src="${imageUrl}" alt="${name}" loading="lazy" onerror="this.style.display='none'">`
       : "";
 
+    const promoRow = isDiscountEnabled() && String(category || "") !== "Others";
     const discounted = applyDiscount(price);
     toast.innerHTML =
       imgHtml +
@@ -161,7 +168,7 @@
       `${size   ? ` · ${size}`   : ""}` +
       `${sleeve ? ` · ${sleeve}` : ""}` +
       `${color  ? ` · ${color}`  : ""}` +
-      (isDiscountEnabled()
+      (promoRow
         ? ` — <span class="price-original">${fmt(price)}</span> <span class="price-discounted">${fmt(discounted)}</span></span>`
         : ` — <span class="price-current">${fmt(price)}</span></span>`);
     document.body.appendChild(toast);
@@ -180,27 +187,36 @@
       const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(item.productId)}`;
       const imgLink = item.imageUrl ? item.imageUrl : productPageUrl;
       const lineBaseTotal = Number(item.price || 0) * item.quantity;
-      const lineDiscountTotal = applyDiscount(item.price) * item.quantity;
+      const others = isOthersItem(item);
+      const lineDiscountTotal = others ? lineBaseTotal : applyDiscount(item.price) * item.quantity;
+      const priceLine =
+        others || !isDiscountEnabled()
+          ? ` — ${fmt(lineBaseTotal)}`
+          : ` — Original: ${fmt(lineBaseTotal)} → ${fmt(lineDiscountTotal)} (10% OFF)`;
       return (
         `${i + 1}. ${item.design}` +
         (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
         (item.size        ? ` · Size ${item.size}`          : "") +
         (item.sleeveStyle ? ` · ${item.sleeveStyle}`        : "") +
         (item.color       ? ` · ${item.color}`              : "") +
-        ` — Original: ${fmt(lineBaseTotal)} → ${fmt(lineDiscountTotal)} (10% OFF)` +
+        priceLine +
         `\n   🖼 Image: ${imgLink}` +
         `\n   🔗 View: ${productPageUrl}`
       );
     }).join("\n\n");
     const originalTotal = cart.reduce((s, i) => s + Number(i.price || 0) * i.quantity, 0);
-    const discountedTotal = cart.reduce((s, i) => s + applyDiscount(i.price) * i.quantity, 0);
+    const discountedTotal = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
+    const showPromoTotals = isDiscountEnabled() && cart.some((i) => !isOthersItem(i));
+    const totalsBlock = showPromoTotals
+      ? `Cart Total (before discount): ${fmt(originalTotal)}\n` +
+        `Cart Total after 10% OFF (eligible items): ${fmt(discountedTotal)}\n\n`
+      : `Cart Total: ${fmt(discountedTotal)}\n\n`;
     const msg = `Hi SHGAdrip! Here's my order:
 
 ${lines}
 
 ` +
-                `Cart Total (before discount): ${fmt(originalTotal)}\n` +
-                `Cart Total after 10% OFF: ${fmt(discountedTotal)}\n\n` +
+                totalsBlock +
                 `Please confirm details. Thanks!`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   }
@@ -247,7 +263,8 @@ ${lines}
         item.sleeveStyle,
         item.color,
         item.price,
-        item.imageUrl || item.imageUrl /* fallback same field, safe */
+        item.imageUrl || item.imageUrl /* fallback same field, safe */,
+        item.category,
       );
     },
 

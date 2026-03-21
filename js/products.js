@@ -42,37 +42,76 @@ import { db } from "../firebase-config.js";   // ← shared instance, no re-init
 import { collection, query, orderBy, onSnapshot, limit }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ── Map Firestore doc → shape script.js expects ─── */
+function normalizePriceField(raw) {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeSizes(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((s) => String(s || "").trim())
+    .filter(Boolean);
+}
+
+/* ── Map Firestore doc → shape storefront scripts expect ─── */
 function toProduct(docSnap) {
   const d = docSnap.data();
   const createdAtMs =
     d.createdAt && typeof d.createdAt.toMillis === "function"
       ? d.createdAt.toMillis()
       : Number(d.createdAt) || 0;
-  // Support both field names: `imageUrl` (admin panel) and `image` (alias)
-  const resolvedImageUrl = d.imageUrl || d.image || "";
+  const resolvedImageUrl = String(d.imageUrl || d.image || "").trim();
   const rawCategory = d.category || "T-Shirts";
   const normalizedCategory = rawCategory === "Unisex" ? "T-Shirts" : rawCategory;
   const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
   const category = KNOWN_CATEGORIES.includes(normalizedCategory) ? normalizedCategory : "Others";
+
+  if (category === "Others") {
+    const colors = Array.isArray(d.colors)
+      ? d.colors.map((c) => String(c || "").trim()).filter(Boolean)
+      : [];
+    return {
+      id: docSnap.id,
+      name: String(d.name || "").trim() || "Untitled",
+      description: String(d.description || "").trim(),
+      price: normalizePriceField(d.price),
+      imageUrl: resolvedImageUrl,
+      image: resolvedImageUrl,
+      category: "Others",
+      colors,
+      createdAtMs,
+    };
+  }
+
+  const sizes = normalizeSizes(d.sizes);
+  const colors = Array.isArray(d.colors)
+    ? d.colors.map((c) => String(c || "").trim()).filter(Boolean)
+    : [];
+  const gradePrices =
+    d.gradePrices != null && typeof d.gradePrices === "object" && !Array.isArray(d.gradePrices)
+      ? d.gradePrices
+      : {};
+
   return {
-    id:          docSnap.id,
-    name:        d.name        || "Untitled",
-    description: d.description || "",
+    id: docSnap.id,
+    name: String(d.name || "").trim() || "Untitled",
+    description: String(d.description || "").trim(),
     category,
-    price:       Number(d.price)  || 0,
-    stock:       Number(d.stock)  || 0,
-    gsm:         d.gsm        || "",
-    grade:       d.grade       || "Premium",
-    grades:      Array.isArray(d.grades) ? d.grades : [],
-    gradePrices: d.gradePrices || {},       // per-grade prices set by admin
-    hasSleeveless: d.hasSleeveless || false, // admin-enabled sleeveless option
-    sizes:       Array.isArray(d.sizes)  ? d.sizes  : ["S","M","L","XL","2XL","3XL"],
-    colors:      Array.isArray(d.colors) ? d.colors : ["White","Black"],
-    isFeatured:  Boolean(d.isFeatured || d.featured),
+    price: normalizePriceField(d.price),
+    stock: Number.isFinite(Number(d.stock)) ? Math.max(0, Math.floor(Number(d.stock))) : 0,
+    gsm: d.gsm || "",
+    grade: d.grade || "",
+    grades: Array.isArray(d.grades) ? d.grades : [],
+    gradePrices,
+    hasSleeveless: Boolean(d.hasSleeveless),
+    sizes,
+    colors,
+    isFeatured: Boolean(d.isFeatured || d.featured),
     createdAtMs,
-    image:       resolvedImageUrl,
-    imageUrl:    resolvedImageUrl,
+    image: resolvedImageUrl,
+    imageUrl: resolvedImageUrl,
     type:
       category === "Sleeveless" || d.type === "sleeveless"
         ? "sleeveless"
@@ -122,15 +161,30 @@ function start() {
   onSnapshot(q, snapshot => {
     const fresh = snapshot.docs.map(toProduct);
 
-    // Skip re-render if data is identical (e.g. metadata-only Firestore updates)
-    const fingerprint = JSON.stringify(fresh.map(p => ({
-      id: p.id,
-      stock: p.stock,
-      name: p.name,
-      isFeatured: p.isFeatured,
-      createdAtMs: p.createdAtMs,
-      price: p.price
-    })));
+    const fingerprint = JSON.stringify(fresh.map(p => {
+      if (p.category === "Others") {
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: p.price,
+          imageUrl: p.imageUrl,
+          category: p.category,
+          colors: p.colors,
+          createdAtMs: p.createdAtMs,
+        };
+      }
+      return {
+        id: p.id,
+        stock: p.stock,
+        name: p.name,
+        description: p.description,
+        isFeatured: p.isFeatured,
+        createdAtMs: p.createdAtMs,
+        price: p.price,
+        sizes: p.sizes,
+      };
+    }));
     if (fingerprint === _lastSnapshot) return;
     _lastSnapshot = fingerprint;
 
@@ -141,7 +195,6 @@ function start() {
     }
   }, err => {
     console.error("SHGAdrip products.js: Firestore error →", err.code, err.message);
-    // Fallback: keep existing products (or empty) and re-render
     window.products = window.products || [];
     if (typeof window.renderProducts === "function") {
       window.renderProducts();

@@ -1092,6 +1092,21 @@ textarea {
   margin-bottom: 0.5rem;
 }
 
+.card-others-colors {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: -0.2rem 0 0.45rem;
+  line-height: 1.35;
+}
+
+.others-colors-text {
+  font-size: 0.85rem;
+  color: var(--white-dim);
+  margin: 0.25rem 0 0;
+  line-height: 1.4;
+}
+
 @media (min-width: 768px) {
   .card-name {
     font-size: 1.15rem;
@@ -1144,7 +1159,8 @@ textarea {
 /* ── Quick add-to-cart button on collection cards ── */
 .product-card { position: relative; }
 
-.card-add-to-cart-btn {
+.card-add-to-cart-btn,
+.card-others-wa-btn {
   position: absolute;
   bottom: 0.85rem;
   right: 0.85rem;
@@ -1165,11 +1181,16 @@ textarea {
   z-index: 2;
   box-shadow: 0 4px 14px rgba(201, 168, 76, 0.35);
 }
-.product-card:hover .card-add-to-cart-btn {
+.card-others-wa-btn {
+  text-decoration: none;
+}
+.product-card:hover .card-add-to-cart-btn,
+.product-card:hover .card-others-wa-btn {
   opacity: 1;
   transform: scale(1) translateY(0);
 }
-.card-add-to-cart-btn:hover { background: #e2c06a; }
+.card-add-to-cart-btn:hover,
+.card-others-wa-btn:hover { background: #e2c06a; }
 .card-add-to-cart-btn.added {
   background: #4dbf7f;
   color: #fff;
@@ -1177,7 +1198,8 @@ textarea {
   transform: scale(1.08) translateY(0);
 }
 @media (hover: none) {
-  .card-add-to-cart-btn { opacity: 1; transform: scale(1) translateY(0); }
+  .card-add-to-cart-btn,
+  .card-others-wa-btn { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* ===================================

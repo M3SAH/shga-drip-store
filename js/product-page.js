@@ -1,50 +1,38 @@
 /**
  * product-page.js
- * Renders a single product page: product.html?id=<firestoreDocId>
+ * Renders product.html?id=<firestoreDocId>
  */
+
+import { CONFIG } from "./config.js";
+import {
+  parseProductPrice,
+  buildStorefrontPriceHtml,
+  resolveLinePrice,
+  getGradePriceOptions,
+  formatPrice,
+  applyDiscount,
+  isOthersProduct,
+  buildOthersWhatsAppUrl,
+  isDiscountActiveForProduct,
+} from "./utils/pricing.js";
 
 (() => {
   const BUSINESS_WA = "2348134421763";
 
   const $ = (id) => document.getElementById(id);
   const $$ = (sel) => document.querySelectorAll(sel);
-  const formatPrice = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
 
-  const isDiscountEnabled = () => localStorage.getItem("discountEnabled") !== "false";
-
-  const DISCOUNT_RATE = 0.10;
-  const applyDiscount = (price) => {
-    const base = Number(price) || 0;
-    return Math.round(base * (1 - DISCOUNT_RATE));
-  };
-
-  const buildDiscountPriceHtml = (price, { suffix = "" } = {}) => {
-    const base = Number(price) || 0;
-    if (!base) return formatPrice(0);
-    if (!isDiscountEnabled()) {
-      return `<span class="price-current">${formatPrice(base)}${suffix}</span>`;
-    }
-    const discounted = applyDiscount(base);
-    return (
-      `<span class="price-original">${formatPrice(base)}</span>` +
-      `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
-    );
-  };
-
-  const DEFAULT_GRADES = [
-    { name: "Standard Pro 250 GSM", price: 16000 },
-    { name: "New Premium 320 GSM", price: 22000 },
-    { name: "Prime 350 GSM", price: 28000 },
-    { name: "Stone Wash 370 GSM", price: 30000 },
-  ];
+  const buildDiscountPriceHtml = (price, opts = {}, product = null) =>
+    buildStorefrontPriceHtml(price, {
+      ...opts,
+      discountEnabled: isDiscountActiveForProduct(product, CONFIG.discountEnabled),
+    });
 
   const SLEEVE_STYLES = [
     { id: "sleeved", name: "With Sleeves" },
     { id: "sleeveless", name: "Sleeveless" },
   ];
 
-  // Canonical size list (meets requirement: includes 3XL)
-  // Also accepts legacy "XXL" values from older products.
   const CANON_SIZES = ["M", "L", "XL", "2XL", "3XL"];
   const normalizeSize = (s) => {
     const v = String(s || "").toUpperCase().trim();
@@ -58,38 +46,24 @@
     return sp.get("id") || "";
   }
 
-  function getProductGrades(product) {
-    if (!product) return [];
-    if (product.category === "Caps") return [{ name: "Fixed Price", price: 10000 }];
-    if (product.category === "Hoodies") return [{ name: "Fixed Price", price: 30000 }];
-    if (product.type === "sleeveless") return [];
-    const enabled = Array.isArray(product.grades) && product.grades.length
-      ? product.grades
-      : DEFAULT_GRADES.map(g => g.name);
-    const gradePrices = product.gradePrices || {};
-    return DEFAULT_GRADES
-      .filter(g => enabled.includes(g.name))
-      .map(g => ({
-        name: g.name,
-        price: gradePrices[g.name] ? Number(gradePrices[g.name]) : g.price,
-      }));
-  }
-
   function buildWaLink({ product, grade, sleeve, size, color }) {
-    const basePriceRaw = (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
-      ? (grade?.price || product.price || 0)
-      : (grade?.price || DEFAULT_GRADES[0].price);
-    const basePrice = Number(basePriceRaw) || 0;
-    const discountPrice = applyDiscount(basePrice);
+    const basePrice = resolveLinePrice(product, grade);
+    const baseNum = basePrice == null ? null : Number(basePrice);
+    const promoOn = isDiscountActiveForProduct(product, CONFIG.discountEnabled);
+    const discountPrice = baseNum != null ? applyDiscount(baseNum, promoOn) : null;
+    const priceLabel = baseNum == null ? "Price unavailable" : formatPrice(baseNum);
+    const discLabel = discountPrice != null ? formatPrice(discountPrice) : "";
+
     const gradeInfo = (() => {
-      if (!isDiscountEnabled()) {
-        return (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
-          ? `Fixed Price: ${formatPrice(basePrice)}`
-          : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)}`;
+      if (baseNum == null) return "Price: unavailable — please confirm with seller";
+      if (!promoOn) {
+        return grade
+          ? `Shirt Grade: ${grade.name} — ${priceLabel}`
+          : `Price: ${priceLabel}`;
       }
-      return (product.category === "Caps" || product.category === "Hoodies" || product.type === "sleeveless")
-        ? `Fixed Price: ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`
-        : `Shirt Grade: ${grade?.name || DEFAULT_GRADES[0].name} — ${formatPrice(basePrice)} → ${formatPrice(discountPrice)} (10% OFF)`;
+      return grade
+        ? `Shirt Grade: ${grade.name} — ${priceLabel} → ${discLabel} (10% OFF)`
+        : `Price: ${priceLabel} → ${discLabel} (10% OFF)`;
     })();
 
     const imageUrl = product.imageUrl || product.image || "";
@@ -150,7 +124,7 @@
 
   function renderProductPage() {
     document.querySelectorAll(".promo-banner").forEach((el) => {
-      el.style.display = isDiscountEnabled() ? "" : "none";
+      el.style.display = CONFIG.discountEnabled ? "" : "none";
     });
     const id = productIdFromUrl();
     const shell = $("productShell");
@@ -184,7 +158,7 @@
     const img = $("productImg");
     const name = $("productName");
     const cat = $("productCategory");
-    const price = $("productPrice");
+    const priceEl = $("productPrice");
     const desc = $("productDesc");
 
     if (img) {
@@ -193,7 +167,67 @@
     }
     if (name) name.textContent = product.name || "Untitled";
     if (cat) cat.textContent = product.category || "";
-    if (desc) desc.textContent = product.description || "";
+    if (desc) desc.textContent = product.description != null ? String(product.description) : "";
+
+    const selectorsRoot = shell?.querySelector(".product-selectors");
+    const addToCartBtn = $("productAddToCart");
+
+    if (isOthersProduct(product)) {
+      const gradeSelect = $("gradeSelect");
+      const sleeveSelect = $("sleeveSelect");
+      const sizeSelect = $("sizeSelect");
+      const colorSelect = $("colorSelect");
+      const gradeWrap = gradeSelect?.closest(".product-select");
+      const sleeveWrap = sleeveSelect?.closest(".product-select");
+      const sizeWrap = sizeSelect?.closest(".product-select");
+      const colorWrap = colorSelect?.closest(".product-select");
+
+      const savedColors = Array.isArray(product.colors) && product.colors.length
+        ? product.colors
+        : [];
+
+      if (selectorsRoot) {
+        if (savedColors.length) {
+          selectorsRoot.style.display = "";
+          if (gradeWrap) gradeWrap.style.display = "none";
+          if (sleeveWrap) sleeveWrap.style.display = "none";
+          if (sizeWrap) sizeWrap.style.display = "none";
+          if (colorWrap) colorWrap.style.display = "";
+          if (colorSelect) {
+            colorSelect.disabled = false;
+            colorSelect.innerHTML = savedColors.map((c) => `<option value="${c}">${c}</option>`).join("");
+          }
+        } else {
+          selectorsRoot.style.display = "none";
+        }
+      }
+
+      if (priceEl) priceEl.innerHTML = buildDiscountPriceHtml(parseProductPrice(product), {}, product);
+      const waSimple = $("waOrderBtn");
+      const othersColor = savedColors.length && colorSelect ? colorSelect.value : "";
+      if (waSimple) {
+        waSimple.href = buildOthersWhatsAppUrl(product, othersColor || null);
+        waSimple.innerHTML = `<i class="fa-brands fa-whatsapp"></i> Order via WhatsApp`;
+        waSimple.style.removeProperty("pointer-events");
+        waSimple.style.removeProperty("opacity");
+        waSimple.setAttribute("aria-disabled", "false");
+      }
+      if (colorSelect && savedColors.length) {
+        colorSelect.onchange = () => {
+          if (waSimple) {
+            waSimple.href = buildOthersWhatsAppUrl(product, colorSelect.value || null);
+          }
+        };
+      }
+      if (addToCartBtn) addToCartBtn.style.display = "none";
+      setStateMessage("");
+      if (shell) shell.style.display = "grid";
+      document.title = `${product.name || "Product"} | SHGAdrip`;
+      return;
+    }
+
+    if (selectorsRoot) selectorsRoot.style.display = "";
+    if (addToCartBtn) addToCartBtn.style.display = "";
 
     const gradeSelect = $("gradeSelect");
     const sleeveSelect = $("sleeveSelect");
@@ -201,133 +235,140 @@
     const colorSelect = $("colorSelect");
     const waBtn = $("waOrderBtn");
 
-    const grades = getProductGrades(product);
+    const gradeWrap = gradeSelect?.closest(".product-select");
+    const grades = getGradePriceOptions(product);
+    const outOfStock = Number(product.stock) === 0;
 
-    const isFixedPrice =
-      product.category === "Caps" || product.category === "Hoodies";
-
-    if (isFixedPrice) {
-      const gradeWrap = gradeSelect && gradeSelect.closest(".product-select");
-      const sleeveWrap =
-        sleeveSelect && sleeveSelect.closest(".product-select");
+    if (product.type === "sleeveless" || !grades.length) {
       if (gradeWrap) gradeWrap.style.display = "none";
-      if (sleeveWrap) sleeveWrap.style.display = "none";
-    }
-
-    // Grade selector
-    if (gradeSelect) {
-      if (product.type === "sleeveless") {
-        gradeSelect.innerHTML = `<option value="fixed">Fixed price</option>`;
-        gradeSelect.disabled = true;
-      } else {
-        const toShow = grades.length ? grades : DEFAULT_GRADES;
+    } else {
+      if (gradeWrap) gradeWrap.style.display = "";
+      if (gradeSelect) {
         gradeSelect.disabled = false;
-        gradeSelect.innerHTML = toShow.map((g) =>
-          `<option value="${encodeURIComponent(g.name)}">${g.name} — ${formatPrice(g.price)}</option>`
+        gradeSelect.innerHTML = grades.map((g) =>
+          `<option value="${encodeURIComponent(g.name)}">${g.name} — ${formatPrice(g.price)}</option>`,
         ).join("");
       }
     }
 
-    // Sleeve selector
     const showSleeves = Boolean(product.hasSleeveless) || product.type === "sleeveless";
     if (sleeveSelect) {
       sleeveSelect.disabled = !showSleeves;
       sleeveSelect.innerHTML = (showSleeves ? SLEEVE_STYLES : [SLEEVE_STYLES[0]]).map((s) =>
-        `<option value="${s.id}">${s.name}</option>`
+        `<option value="${s.id}">${s.name}</option>`,
       ).join("");
       if (product.type === "sleeveless") sleeveSelect.value = "sleeveless";
     }
 
-    // Size selector (Caps: hide; others: show)
-    const sizeWrap = sizeSelect && sizeSelect.closest(".product-select");
+    const sizeWrap = sizeSelect?.closest(".product-select");
     if (product.category === "Caps") {
       if (sizeWrap) sizeWrap.style.display = "none";
     } else {
-      if (sizeWrap) sizeWrap.style.display = "";
       const savedSizes = Array.isArray(product.sizes) && product.sizes.length
         ? product.sizes.map(normalizeSize)
-        : CANON_SIZES;
-      const allowedSizes = CANON_SIZES.filter(s => savedSizes.includes(s));
-      const sizes = allowedSizes.length ? allowedSizes : CANON_SIZES;
-      if (sizeSelect) {
-        sizeSelect.disabled = false;
-        sizeSelect.innerHTML = sizes.map((s) => `<option value="${s}">${s}</option>`).join("");
+        : [];
+      const allowed = CANON_SIZES.filter(s => savedSizes.includes(s));
+      if (!allowed.length) {
+        if (sizeWrap) sizeWrap.style.display = "none";
+      } else {
+        if (sizeWrap) sizeWrap.style.display = "";
+        if (sizeSelect) {
+          sizeSelect.disabled = false;
+          sizeSelect.innerHTML = allowed.map((s) => `<option value="${s}">${s}</option>`).join("");
+        }
       }
     }
 
-    // Color selector
+    const colorWrap = colorSelect?.closest(".product-select");
     const savedColors = Array.isArray(product.colors) && product.colors.length
       ? product.colors
-      : ["White", "Black"];
-    if (colorSelect) {
-      colorSelect.disabled = false;
-      colorSelect.innerHTML = savedColors.map((c) => `<option value="${c}">${c}</option>`).join("");
+      : [];
+    if (!savedColors.length) {
+      if (colorWrap) colorWrap.style.display = "none";
+    } else {
+      if (colorWrap) colorWrap.style.display = "";
+      if (colorSelect) {
+        colorSelect.disabled = false;
+        colorSelect.innerHTML = savedColors.map((c) => `<option value="${c}">${c}</option>`).join("");
+      }
+    }
+
+    function selectedGradeFromUi() {
+      if (!grades.length || product.type === "sleeveless") return null;
+      const gradeName = gradeSelect ? decodeURIComponent(gradeSelect.value || "") : "";
+      return grades.find(g => g.name === gradeName) || grades[0] || null;
     }
 
     function updatePriceAndLink() {
       const sleeve = sleeveSelect ? sleeveSelect.value : "sleeved";
       const sleeveName = sleeve === "sleeveless" ? "Sleeveless" : "With Sleeves";
-      const sizeVal = (product.category === "Caps") ? "" : (sizeSelect ? sizeSelect.value : "");
-      const colorVal = colorSelect ? colorSelect.value : "";
+      const caps = product.category === "Caps";
+      const sizeHidden = caps || (sizeSelect?.closest(".product-select")?.style.display === "none");
+      const sizeVal = sizeHidden ? "" : (sizeSelect ? sizeSelect.value : "");
+      const colorHidden = colorSelect?.closest(".product-select")?.style.display === "none";
+      const colorVal = colorHidden ? "" : (colorSelect ? colorSelect.value : "");
 
-      let selectedGrade = null;
-      if (product.type !== "sleeveless") {
-        const gradeName = gradeSelect ? decodeURIComponent(gradeSelect.value || "") : "";
-        selectedGrade = (grades.length ? grades : DEFAULT_GRADES).find(g => g.name === gradeName) || (grades[0] || DEFAULT_GRADES[0]);
-      }
+      const selectedGrade = selectedGradeFromUi();
+      const priceVal = resolveLinePrice(product, selectedGrade);
 
-      const priceVal = product.type === "sleeveless"
-        ? Number(product.price) || 0
-        : Number(selectedGrade?.price || 0);
-
-      if (price) {
+      if (priceEl) {
         const suffix = product.type === "sleeveless" ? "" : " / shirt";
-        price.innerHTML = buildDiscountPriceHtml(priceVal, { suffix });
+        let html = buildDiscountPriceHtml(priceVal, { suffix }, product);
+        if (outOfStock) {
+          html += `<br><span class="price-unavailable" style="display:inline-block;margin-top:0.35rem">Out of stock</span>`;
+        }
+        priceEl.innerHTML = html;
       }
 
+      const lineOk = priceVal != null && !outOfStock;
       if (waBtn) {
-        const sleeveForWa = (product.category === "Caps") ? "" : (showSleeves ? sleeveName : "");
-        waBtn.href = buildWaLink({
+        waBtn.href = lineOk ? buildWaLink({
           product,
           grade: selectedGrade,
-          sleeve: sleeveForWa,
+          sleeve: caps ? "" : (showSleeves ? sleeveName : ""),
           size: sizeVal,
           color: colorVal,
-        });
+        }) : "#";
+        waBtn.setAttribute("aria-disabled", lineOk ? "false" : "true");
+        waBtn.style.pointerEvents = lineOk ? "" : "none";
+        waBtn.style.opacity = lineOk ? "" : "0.5";
       }
 
-      // Wire add-to-cart button on this page
-      const addToCartBtn = $("productAddToCart");
-      if (addToCartBtn && window.SHGACart) {
-        addToCartBtn.onclick = () => {
-          window.SHGACart.add({
-            productId:  product.id,
-            design:     product.name,
-            imageUrl:   product.imageUrl || product.image || "",
-            shirtGrade: selectedGrade ? selectedGrade.name : null,
-            price:      priceVal,
-            size:       sizeVal || null,
-            sleeveStyle: (product.category === "Caps") ? null : sleeveName,
-            color:      colorVal || null,
-          });
-        };
+      if (addToCartBtn) {
+        addToCartBtn.disabled = !lineOk;
+        addToCartBtn.style.opacity = lineOk ? "" : "0.5";
+        addToCartBtn.onclick = lineOk && window.SHGACart
+          ? () => {
+              window.SHGACart.add({
+                productId: product.id,
+                design: product.name,
+                imageUrl: product.imageUrl || product.image || "",
+                productPageUrl: `${window.location.origin}/product.html?id=${encodeURIComponent(product.id)}`,
+                shirtGrade: selectedGrade ? selectedGrade.name : null,
+                price: priceVal,
+                category: product.category || null,
+                size: sizeVal || null,
+                sleeveStyle: caps ? null : sleeveName,
+                color: colorVal || null,
+              });
+            }
+          : null;
       }
     }
 
-    [gradeSelect, sleeveSelect, sizeSelect, colorSelect].forEach((el) => {
-      if (!el) return;
-      el.addEventListener("change", updatePriceAndLink);
-    });
+    const onCh = () => updatePriceAndLink();
+    if (gradeSelect) gradeSelect.onchange = onCh;
+    if (sleeveSelect) sleeveSelect.onchange = onCh;
+    if (sizeSelect) sizeSelect.onchange = onCh;
+    if (colorSelect) colorSelect.onchange = onCh;
 
     updatePriceAndLink();
 
-    // Show shell and clear loading state
     setStateMessage("");
     if (shell) shell.style.display = "grid";
     document.title = `${product.name || "Product"} | SHGAdrip`;
   }
 
-  // products.js calls this when Firestore arrives/updates
   window.renderProducts = renderProductPage;
 
   if (document.readyState === "loading") {
@@ -340,4 +381,3 @@
     renderProductPage();
   }
 })();
-
