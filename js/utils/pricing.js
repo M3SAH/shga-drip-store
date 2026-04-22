@@ -3,6 +3,26 @@ export const DISCOUNT_RATE = 0.10;
 export const PRICE_UNAVAILABLE_TEXT = "Price unavailable";
 
 const WA_PHONE = "2348134421763";
+const MAX_PRODUCT_IMAGES = 10;
+
+export function getProductImages(product) {
+  const candidates = [];
+  if (Array.isArray(product?.images)) {
+    candidates.push(...product.images);
+  }
+  if (product?.imageUrl) candidates.push(product.imageUrl);
+  if (product?.image) candidates.push(product.image);
+  const out = [];
+  const seen = new Set();
+  for (const raw of candidates) {
+    const url = String(raw || "").trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= MAX_PRODUCT_IMAGES) break;
+  }
+  return out;
+}
 
 /** Simple advertised items (socks, accessories, etc.) — no sizes/grades/stock. */
 export function isOthersProduct(product) {

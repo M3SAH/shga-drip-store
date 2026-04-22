@@ -14,6 +14,7 @@ import {
   isOthersProduct,
   buildOthersWhatsAppUrl,
   isDiscountActiveForProduct,
+  getProductImages,
 } from "./utils/pricing.js";
 
 (() => {
@@ -86,6 +87,34 @@ import {
   function setStateMessage(html) {
     const el = $("productState");
     if (el) el.innerHTML = html;
+  }
+
+  function renderProductImageSlider(product) {
+    const wrap = document.querySelector(".product-img");
+    if (!wrap) return;
+    const images = getProductImages(product);
+    const list = images.length ? images : [product.image || product.imageUrl || ""];
+    if (list.length <= 1) {
+      wrap.innerHTML = `<img id="productImg" src="${list[0] || ""}" alt="${product.name || "Product image"}" loading="eager" decoding="async" />`;
+      return;
+    }
+    wrap.innerHTML = `
+      <button type="button" class="product-slider-nav prev" aria-label="Previous image"><i class="fa-solid fa-chevron-left"></i></button>
+      <img id="productImg" src="${list[0]}" alt="${product.name || "Product image"}" loading="eager" decoding="async" />
+      <button type="button" class="product-slider-nav next" aria-label="Next image"><i class="fa-solid fa-chevron-right"></i></button>
+      <div class="product-slider-dots">${list.map((_, i) => `<button type="button" class="product-slider-dot${i === 0 ? " active" : ""}" data-slide="${i}" aria-label="View image ${i + 1}"></button>`).join("")}</div>
+    `;
+    let idx = 0;
+    const img = wrap.querySelector("#productImg");
+    const dots = Array.from(wrap.querySelectorAll(".product-slider-dot"));
+    const setSlide = (next) => {
+      idx = (next + list.length) % list.length;
+      if (img) img.src = list[idx];
+      dots.forEach((dot, i) => dot.classList.toggle("active", i === idx));
+    };
+    wrap.querySelector(".product-slider-nav.prev")?.addEventListener("click", () => setSlide(idx - 1));
+    wrap.querySelector(".product-slider-nav.next")?.addEventListener("click", () => setSlide(idx + 1));
+    dots.forEach((dot) => dot.addEventListener("click", () => setSlide(Number(dot.dataset.slide || 0))));
   }
 
   function initNav() {
@@ -165,6 +194,7 @@ import {
       img.src = product.image || product.imageUrl || "";
       img.alt = product.name || "Product image";
     }
+    renderProductImageSlider(product);
     if (name) name.textContent = product.name || "Untitled";
     if (cat) cat.textContent = product.category || "";
     if (desc) desc.textContent = product.description != null ? String(product.description) : "";

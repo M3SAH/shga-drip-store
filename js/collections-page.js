@@ -13,6 +13,7 @@ import {
   isOthersProduct,
   buildOthersWhatsAppUrl,
   isDiscountActiveForProduct,
+  getProductImages,
 } from "./utils/pricing.js";
 
 const PAGE_SIZE = 20;
@@ -121,6 +122,16 @@ function renderPage(pageNum) {
   const frag = document.createDocumentFragment();
 
   for (const product of next) {
+    const images = getProductImages(product);
+    const primaryImage = images[0] || "";
+    const sliderAttr = String(JSON.stringify(images))
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const dotsHtml = images.length > 1
+      ? `<div class="card-slider-dots">${images.map((_, idx) => `<button class="card-slider-dot${idx === 0 ? " active" : ""}" data-slide="${idx}" aria-label="View image ${idx + 1}"></button>`).join("")}</div>`
+      : "";
     const card = document.createElement("div");
     card.className = "product-card product-card--collections";
 
@@ -156,15 +167,16 @@ function renderPage(pageNum) {
           href="${href}"
           aria-label="View ${product.name}"
         >
-          <div class="card-image">
+          <div class="card-image card-image-slider" data-images="${sliderAttr}">
             <img
-              src="${product.image || product.imageUrl || ""}"
+              src="${primaryImage}"
               alt="${product.name}"
               loading="lazy"
               decoding="async"
               onerror="this.parentElement.style.background='var(--black-3)'; this.style.display='none'"
             />
             ${stockBadge}
+            ${dotsHtml}
           </div>
           <div class="card-body">
             <p class="card-cat">${product.category || ""}</p>
@@ -206,9 +218,42 @@ function renderPage(pageNum) {
   }
 
   grid.appendChild(frag);
+  initCardImageSliders(grid);
   updateCountUI(total, page);
 
   grid.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function initCardImageSliders(root) {
+  root.querySelectorAll(".card-image-slider").forEach((el) => {
+    let images = [];
+    try {
+      images = JSON.parse(el.dataset.images || "[]");
+    } catch {
+      images = [];
+    }
+    if (!Array.isArray(images) || images.length <= 1) return;
+    const img = el.querySelector("img");
+    const dots = Array.from(el.querySelectorAll(".card-slider-dot"));
+    let idx = 0;
+    const setActive = (next) => {
+      idx = (next + images.length) % images.length;
+      if (img) img.src = images[idx];
+      dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+    };
+    dots.forEach((dot) => {
+      dot.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActive(Number(dot.dataset.slide || 0));
+      });
+    });
+    let timer = window.setInterval(() => setActive(idx + 1), 2600);
+    el.addEventListener("mouseenter", () => window.clearInterval(timer));
+    el.addEventListener("mouseleave", () => {
+      timer = window.setInterval(() => setActive(idx + 1), 2600);
+    });
+  });
 }
 
 function renderPagination(totalItems) {

@@ -55,6 +55,22 @@ function normalizeSizes(raw) {
     .filter(Boolean);
 }
 
+function normalizeImages(rawImages, fallbackImageUrl) {
+  const out = [];
+  const seen = new Set();
+  const list = Array.isArray(rawImages) ? rawImages : [];
+  for (const raw of list) {
+    const url = String(raw || "").trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= 10) break;
+  }
+  const fallback = String(fallbackImageUrl || "").trim();
+  if (fallback && !seen.has(fallback) && out.length < 10) out.push(fallback);
+  return out;
+}
+
 /* ── Map Firestore doc → shape storefront scripts expect ─── */
 function toProduct(docSnap) {
   const d = docSnap.data();
@@ -63,6 +79,7 @@ function toProduct(docSnap) {
       ? d.createdAt.toMillis()
       : Number(d.createdAt) || 0;
   const resolvedImageUrl = String(d.imageUrl || d.image || "").trim();
+  const images = normalizeImages(d.images, resolvedImageUrl);
   const rawCategory = d.category || "T-Shirts";
   const normalizedCategory = rawCategory === "Unisex" ? "T-Shirts" : rawCategory;
   const KNOWN_CATEGORIES = ["T-Shirts", "Hoodies", "Caps", "Sleeveless"];
@@ -79,6 +96,7 @@ function toProduct(docSnap) {
       price: normalizePriceField(d.price),
       imageUrl: resolvedImageUrl,
       image: resolvedImageUrl,
+      images,
       category: "Others",
       colors,
       createdAtMs,
@@ -112,6 +130,7 @@ function toProduct(docSnap) {
     createdAtMs,
     image: resolvedImageUrl,
     imageUrl: resolvedImageUrl,
+    images,
     type:
       category === "Sleeveless" || d.type === "sleeveless"
         ? "sleeveless"

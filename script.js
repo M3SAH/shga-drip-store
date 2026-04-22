@@ -32,6 +32,7 @@ import {
   isOthersProduct,
   buildOthersWhatsAppUrl,
   isDiscountActiveForProduct,
+  getProductImages,
 } from "./js/utils/pricing.js";
 
 const hideOrShowPromoUi = () => {
@@ -259,11 +260,18 @@ const renderProducts = () => {
       ? "Order via WhatsApp"
       : (outOfStock ? "Unavailable" : "Choose Grade &amp; Color");
 
+    const images = getProductImages(product);
+    const primaryImage = images[0] || "";
+    const sliderAttr = escapeHtml(JSON.stringify(images));
+    const dotsHtml = images.length > 1
+      ? `<div class="card-slider-dots">${images.map((_, idx) => `<button class="card-slider-dot${idx === 0 ? " active" : ""}" data-slide="${idx}" aria-label="View image ${idx + 1}"></button>`).join("")}</div>`
+      : "";
     card.innerHTML = `
-      <div class="card-image">
-        <img src="${product.image || product.imageUrl || ''}" alt="${product.name}" loading="lazy"
+      <div class="card-image card-image-slider" data-images="${sliderAttr}">
+        <img src="${primaryImage}" alt="${product.name}" loading="lazy"
              onerror="this.parentElement.style.background='var(--black-3)'; this.style.display='none'">
         ${stockBadge}
+        ${dotsHtml}
       </div>
       <div class="card-body">
         <p class="card-cat">${product.category}</p>
@@ -288,7 +296,42 @@ const renderProducts = () => {
     frag.appendChild(card);
   });
   productGrid.appendChild(frag);
+  initCardImageSliders(productGrid);
 };
+
+function initCardImageSliders(root) {
+  root.querySelectorAll(".card-image-slider").forEach((el) => {
+    let images = [];
+    try {
+      images = JSON.parse(el.dataset.images || "[]");
+    } catch {
+      images = [];
+    }
+    if (!Array.isArray(images) || images.length <= 1) return;
+    const img = el.querySelector("img");
+    const dots = Array.from(el.querySelectorAll(".card-slider-dot"));
+    let idx = 0;
+    const setActive = (next) => {
+      idx = (next + images.length) % images.length;
+      if (img) img.src = images[idx];
+      dots.forEach((d, i) => d.classList.toggle("active", i === idx));
+    };
+    dots.forEach((dot) => {
+      dot.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActive(Number(dot.dataset.slide || 0));
+      });
+    });
+    let timer = window.setInterval(() => setActive(idx + 1), 2600);
+    el.addEventListener("mouseenter", () => {
+      window.clearInterval(timer);
+    });
+    el.addEventListener("mouseleave", () => {
+      timer = window.setInterval(() => setActive(idx + 1), 2600);
+    });
+  });
+}
 
 // FIX: expose globally so products.js can call it after Firebase loads
 window.renderProducts = renderProducts;

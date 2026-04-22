@@ -2166,7 +2166,7 @@
                 </div>
 
                 <div class="fg span2">
-                  <label>Product Image (Cloudinary)</label>
+                  <label>Product Images (Cloudinary) — up to 10</label>
                   <div
                     style="
                       display: flex;
@@ -2180,7 +2180,7 @@
                       class="btn btn-gold btn-sm"
                       id="a-upload-btn"
                     >
-                      <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                      <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photo
                     </button>
                     <input
                       type="url"
@@ -2198,9 +2198,8 @@
                       display: block;
                     "
                   >
-                    Click <strong>Upload Image</strong> to upload directly to
-                    Cloudinary. The secure URL is stored automatically and saved
-                    with the product.
+                    Upload up to 10 photos. The latest uploaded URL appears in the
+                    field, and all uploaded photos are saved with the product.
                   </small>
                   <div
                     id="a-preview-wrap"
@@ -2215,6 +2214,7 @@
                       />
                     </div>
                   </div>
+                  <div id="a-gallery" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem"></div>
                 </div>
               </div>
               <!-- /form-grid -->
@@ -2549,7 +2549,7 @@
             </div>
 
             <div class="fg span2">
-              <label>Product Image (Cloudinary)</label>
+              <label>Product Images (Cloudinary) — up to 10</label>
               <div
                 style="
                   display: flex;
@@ -2563,7 +2563,7 @@
                   class="btn btn-gold btn-sm"
                   id="e-upload-btn"
                 >
-                  <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photo
                 </button>
                 <input
                   type="url"
@@ -2580,8 +2580,8 @@
                   display: block;
                 "
               >
-                Leave blank to keep the current image. Or click
-                <strong>Upload Image</strong> to upload a new one to Cloudinary.
+                Upload up to 10 photos. Leave field blank to keep existing. New
+                uploads are appended to the gallery.
               </small>
               <div
                 id="e-preview-wrap"
@@ -2596,6 +2596,7 @@
                   />
                 </div>
               </div>
+              <div id="e-gallery" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem"></div>
             </div>
           </div>
         </div>

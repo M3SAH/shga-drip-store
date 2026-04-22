@@ -57,6 +57,8 @@ const state = {
   catFilter:  "",
   editId:     null,
   editImgUrl: null,
+  addImages:  [],
+  editImages: [],
   deleteId:   null,
   deleteImg:  null,
 };
@@ -149,6 +151,7 @@ function initAdminUI() {
   initChips("a-sizes");
   initChips("a-colors");
   initImageUrlPreview("a-image-url", "a-preview", "a-preview-wrap");
+  renderImageGallery("a");
   initGradePriceInputs("a-grades", "a-grade-prices");
   initSleevelessChip("a-sleeveless");
   initFeaturedChip("a-featured");
@@ -162,6 +165,7 @@ function initAdminUI() {
   initChips("e-sizes");
   initChips("e-colors");
   initImageUrlPreview("e-image-url", "e-preview", "e-preview-wrap");
+  renderImageGallery("e");
   initGradePriceInputs("e-grades", "e-grade-prices");
   initSleevelessChip("e-sleeveless");
   initFeaturedChip("e-featured");
@@ -368,7 +372,7 @@ function renderManageTable() {
 ══════════════════════════════════════════════ */
 function buildTable(items) {
   const rows = items.map(p => {
-    const imgSrc = p.imageUrl || p.image || "";
+    const imgSrc = (Array.isArray(p.images) && p.images[0]) || p.imageUrl || p.image || "";
     const thumb = imgSrc
       ? `<img class="thumb" src="${esc(imgSrc)}" alt="${esc(p.name)}" loading="lazy"/>`
       : `<div class="thumb-placeholder"><i class="fa-solid fa-shirt"></i></div>`;
@@ -461,6 +465,7 @@ async function handleAdd() {
   const sizes    = isCaps || isOthers ? [] : getChecked("a-sizes");
   const colors   = getChecked("a-colors");
   const imageUrl = val("a-image-url").trim();
+  const images = getNormalizedImageArray(state.addImages, imageUrl);
   const hasSleeveless = isCaps || isOthers ? false : (document.getElementById("a-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("a-featured")?.checked || false;
 
@@ -473,9 +478,9 @@ async function handleAdd() {
 
   if (isOthers) {
     if (!colors.length) return toast("Please select at least one color.", "error");
-    if (!imageUrl) return toast("Please upload a product image using the Upload Image button.", "error");
-    if (!isCloudinaryUrl(imageUrl)) {
-      return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+    if (!images.length) return toast("Please upload at least one product image.", "error");
+    if (images.some((url) => !isCloudinaryUrl(url))) {
+      return toast("All images must be valid Cloudinary URLs (https://res.cloudinary.com/…)", "error");
     }
     const btn = document.getElementById("addBtn");
     setBtnLoading(btn, true);
@@ -484,7 +489,9 @@ async function handleAdd() {
         name,
         description: desc,
         price: priceNum,
-        imageUrl,
+        imageUrl: images[0],
+        image: images[0],
+        images,
         category: "Others",
         colors,
         createdAt: serverTimestamp(),
@@ -508,9 +515,9 @@ async function handleAdd() {
   if (!isCaps && !sizes.length) return toast("Please select at least one size.", "error");
   if (!colors.length) return toast("Please select at least one color.", "error");
 
-  if (!imageUrl) return toast("Please upload a product image using the Upload Image button.", "error");
-  if (!isCloudinaryUrl(imageUrl)) {
-    return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+  if (!images.length) return toast("Please upload at least one product image.", "error");
+  if (images.some((url) => !isCloudinaryUrl(url))) {
+    return toast("All images must be valid Cloudinary URLs (https://res.cloudinary.com/…)", "error");
   }
 
   const showGradeUi = cat === "T-Shirts" || cat === "Sleeveless";
@@ -545,8 +552,9 @@ async function handleAdd() {
       colors,
       hasSleeveless,
       isFeatured,
-      imageUrl,
-      image: imageUrl,
+      imageUrl: images[0],
+      image: images[0],
+      images,
       createdAt: serverTimestamp(),
     };
     if (showGradeUi && grades.length && gradePrices) {
@@ -573,6 +581,8 @@ function resetAddForm() {
   ["a-name", "a-desc", "a-stock", "a-price"].forEach(id => set(id, ""));
   set("a-cat", "");
   set("a-image-url", "");
+  state.addImages = [];
+  renderImageGallery("a");
   togglePricingUI("add");
 
   // Grades — default New Premium 320 GSM only
@@ -617,6 +627,7 @@ function openEditModal(docId) {
 
   state.editId     = docId;
   state.editImgUrl = p.imageUrl || p.image || null;
+  state.editImages = getNormalizedImageArray(p.images, p.imageUrl || p.image || "");
 
   set("e-name",  p.name        || "");
   set("e-desc",  p.description || "");
@@ -627,7 +638,8 @@ function openEditModal(docId) {
   set("e-price", ep);
   set("e-stock", p.stock !== undefined && p.stock !== null ? String(p.stock) : "");
   set("e-cat",   p.category    || "Unisex");
-  set("e-image-url", p.imageUrl || p.image || "");
+  set("e-image-url", state.editImages[0] || "");
+  renderImageGallery("e");
 
   if ((p.category || "") === "Others") {
     set("e-stock", "");
@@ -725,6 +737,10 @@ async function handleSaveEdit() {
   const sizes    = isCaps || isOthers ? [] : getChecked("e-sizes");
   const colors   = getChecked("e-colors");
   const newUrl   = val("e-image-url").trim();
+  const existing = state.products.find(x => x.id === state.editId);
+  const keepImages = getNormalizedImageArray(existing?.images, existing?.imageUrl || existing?.image || "");
+  let finalImages = getNormalizedImageArray(state.editImages, newUrl);
+  if (!finalImages.length) finalImages = keepImages;
   const hasSleeveless = isCaps || isOthers ? false : (document.getElementById("e-sleeveless")?.checked || false);
   const isFeatured = document.getElementById("e-featured")?.checked || false;
 
@@ -736,12 +752,9 @@ async function handleSaveEdit() {
 
   if (isOthers) {
     if (!colors.length) return toast("Please select at least one color.", "error");
-    const existing = state.products.find(x => x.id === state.editId);
-    const keepUrl = (existing?.imageUrl || existing?.image || "").trim();
-    const finalUrl = (newUrl || keepUrl).trim();
-    if (!finalUrl) return toast("Please upload a product image.", "error");
-    if (newUrl && !isCloudinaryUrl(newUrl)) {
-      return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+    if (!finalImages.length) return toast("Please upload at least one product image.", "error");
+    if (finalImages.some((url) => !isCloudinaryUrl(url))) {
+      return toast("All images must be valid Cloudinary URLs (https://res.cloudinary.com/…)", "error");
     }
 
     const btn = document.getElementById("editSave");
@@ -753,7 +766,9 @@ async function handleSaveEdit() {
         price: priceNum,
         category: "Others",
         colors,
-        imageUrl: newUrl || keepUrl,
+        imageUrl: finalImages[0],
+        image: finalImages[0],
+        images: finalImages,
         sizes: deleteField(),
         grades: deleteField(),
         grade: deleteField(),
@@ -761,7 +776,6 @@ async function handleSaveEdit() {
         stock: deleteField(),
         hasSleeveless: deleteField(),
         isFeatured: deleteField(),
-        image: deleteField(),
         type: deleteField(),
         gsm: deleteField(),
       };
@@ -784,8 +798,8 @@ async function handleSaveEdit() {
   if (!isCaps && !sizes.length) return toast("Please select at least one size.", "error");
   if (!colors.length) return toast("Please select at least one color.", "error");
 
-  if (newUrl && !isCloudinaryUrl(newUrl)) {
-    return toast("Image URL must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
+  if (finalImages.length && finalImages.some((url) => !isCloudinaryUrl(url))) {
+    return toast("All images must be a valid Cloudinary URL (https://res.cloudinary.com/…)", "error");
   }
 
   const showGradeUi = cat === "T-Shirts" || cat === "Sleeveless";
@@ -832,9 +846,10 @@ async function handleSaveEdit() {
       updates.gradePrices = deleteField();
     }
 
-    if (newUrl) {
-      updates.imageUrl = newUrl;
-      updates.image    = newUrl;
+    if (finalImages.length) {
+      updates.imageUrl = finalImages[0];
+      updates.image = finalImages[0];
+      updates.images = finalImages;
     }
 
     await updateDoc(doc(db, "products", state.editId), updates);
@@ -969,9 +984,11 @@ function initCloudinaryUploadWidgets() {
       }
       if (result && result.event === "success") {
         const url = result.info.secure_url;
-        set("a-image-url", url);
-        updateImageUrlPreview("a-image-url", "a-preview", "a-preview-wrap");
-        toast("Image uploaded successfully.", "success");
+        if (!addImageToState("add", url)) {
+          toast("You can upload up to 10 photos per product.", "warning");
+          return;
+        }
+        toast("Photo uploaded successfully.", "success");
       }
     }
   );
@@ -986,9 +1003,11 @@ function initCloudinaryUploadWidgets() {
       }
       if (result && result.event === "success") {
         const url = result.info.secure_url;
-        set("e-image-url", url);
-        updateImageUrlPreview("e-image-url", "e-preview", "e-preview-wrap");
-        toast("Image uploaded successfully.", "success");
+        if (!addImageToState("edit", url)) {
+          toast("You can upload up to 10 photos per product.", "warning");
+          return;
+        }
+        toast("Photo uploaded successfully.", "success");
       }
     }
   );
@@ -1005,6 +1024,72 @@ function initCloudinaryUploadWidgets() {
       editWidget.open();
     });
   }
+}
+
+function getNormalizedImageArray(images, fallback = "") {
+  const source = Array.isArray(images) ? images : [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of source) {
+    const url = String(raw || "").trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= 10) break;
+  }
+  const base = String(fallback || "").trim();
+  if (base && !seen.has(base) && out.length < 10) out.push(base);
+  return out;
+}
+
+function renderImageGallery(mode) {
+  const isAdd = mode === "a";
+  const arr = isAdd ? state.addImages : state.editImages;
+  const gallery = document.getElementById(`${mode}-gallery`);
+  const inputId = `${mode}-image-url`;
+  if (!gallery) return;
+  const first = arr[0] || "";
+  set(inputId, first);
+  updateImageUrlPreview(inputId, `${mode}-preview`, `${mode}-preview-wrap`);
+  if (!arr.length) {
+    gallery.innerHTML = "";
+    return;
+  }
+  gallery.innerHTML = arr.map((url, idx) => `
+    <div class="preview-wrap" style="margin-top:0">
+      <img class="preview-img" src="${esc(url)}" alt="Product image ${idx + 1}" style="width:70px;height:70px;max-width:none;max-height:none" />
+      <button class="preview-remove" type="button" data-mode="${mode}" data-idx="${idx}" title="Remove image">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  `).join("");
+  gallery.querySelectorAll(".preview-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      if (!Number.isInteger(i) || i < 0) return;
+      if (isAdd) {
+        state.addImages.splice(i, 1);
+      } else {
+        state.editImages.splice(i, 1);
+      }
+      renderImageGallery(mode);
+    });
+  });
+}
+
+function addImageToState(kind, url) {
+  const arr = kind === "add" ? state.addImages : state.editImages;
+  const clean = String(url || "").trim();
+  if (!clean) return false;
+  if (!isCloudinaryUrl(clean)) return false;
+  if (arr.includes(clean)) {
+    renderImageGallery(kind === "add" ? "a" : "e");
+    return true;
+  }
+  if (arr.length >= 10) return false;
+  arr.push(clean);
+  renderImageGallery(kind === "add" ? "a" : "e");
+  return true;
 }
 
 /* ══════════════════════════════════════════════
