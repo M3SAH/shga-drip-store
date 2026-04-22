@@ -1,6 +1,7 @@
 import { db } from "../firebase-config.js";
 import {
   doc,
+  getDoc,
   onSnapshot,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -13,6 +14,7 @@ const LS_KEY = "discountEnabled";
 const SETTINGS_DOC = doc(db, "settings", "storefront");
 const listeners = new Set();
 let syncStarted = false;
+let lastRefreshAt = 0;
 
 function notifyDiscountChanged() {
   listeners.forEach((cb) => {
@@ -79,9 +81,43 @@ function startRemoteConfigSync() {
   });
 }
 
+async function refreshConfigFromRemote() {
+  const now = Date.now();
+  // Prevent burst refreshes on rapid focus/visibility events.
+  if (now - lastRefreshAt < 1200) return;
+  lastRefreshAt = now;
+  try {
+    const snap = await getDoc(SETTINGS_DOC);
+    const data = snap.data() || {};
+    if (typeof data.discountEnabled !== "boolean") return;
+    if (data.discountEnabled === CONFIG.discountEnabled) return;
+    setDiscountEnabled(data.discountEnabled, { persist: true, persistRemote: false });
+  } catch (err) {
+    console.error("Failed to refresh storefront settings:", err);
+  }
+}
+
+function startBrowserSyncHooks() {
+  window.addEventListener("storage", (e) => {
+    if (e.key !== LS_KEY) return;
+    if (e.newValue !== "true" && e.newValue !== "false") return;
+    const next = e.newValue === "true";
+    if (next === CONFIG.discountEnabled) return;
+    setDiscountEnabled(next, { persist: false, persistRemote: false });
+  });
+  window.addEventListener("focus", () => {
+    refreshConfigFromRemote();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshConfigFromRemote();
+  });
+}
+
 try {
   loadConfigFromStorage();
   startRemoteConfigSync();
+  startBrowserSyncHooks();
+  refreshConfigFromRemote();
 } catch {
   // ignore
 }
