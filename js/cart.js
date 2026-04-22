@@ -315,6 +315,14 @@ ${lines}
       }
     });
 
+    window.addEventListener("storage", (e) => {
+      if (e.key !== "discountEnabled") return;
+      renderCartItems();
+    });
+    window.addEventListener("shgadrip:discount-changed", () => {
+      renderCartItems();
+    });
+
     // Hydrate badge on load
     updateBadge();
   }

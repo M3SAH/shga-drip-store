@@ -3,7 +3,7 @@
  * Renders product.html?id=<firestoreDocId>
  */
 
-import { CONFIG } from "./config.js";
+import { CONFIG, onDiscountChange } from "./config.js";
 import {
   parseProductPrice,
   buildStorefrontPriceHtml,
@@ -374,10 +374,12 @@ import {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       initNav();
+      onDiscountChange(() => renderProductPage());
       renderProductPage();
     });
   } else {
     initNav();
+    onDiscountChange(() => renderProductPage());
     renderProductPage();
   }
 })();

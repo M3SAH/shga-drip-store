@@ -3,7 +3,7 @@
  * Renderer for /collections — pagination, filters, shared pricing helpers.
  */
 
-import { CONFIG } from "./config.js";
+import { CONFIG, onDiscountChange } from "./config.js";
 import {
   parseProductPrice,
   buildStorefrontPriceHtml,
@@ -291,6 +291,14 @@ function renderPagination(totalItems) {
 if (grid) {
   document.querySelectorAll(".promo-banner").forEach((el) => {
     el.style.display = CONFIG.discountEnabled ? "" : "none";
+  });
+
+  onDiscountChange(() => {
+    document.querySelectorAll(".promo-banner").forEach((el) => {
+      el.style.display = CONFIG.discountEnabled ? "" : "none";
+    });
+    if (typeof window.renderProducts === "function") window.renderProducts();
+    if (window.SHGACart?.renderItems) window.SHGACart.renderItems();
   });
 
   window.renderProducts = () => {

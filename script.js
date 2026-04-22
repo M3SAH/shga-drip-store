@@ -20,7 +20,7 @@
 
 // Import reviews functionality
 import { initPublicReviews } from "./js/reviews.js";
-import { CONFIG } from "./js/config.js";
+import { CONFIG, onDiscountChange } from "./js/config.js";
 import {
   applyDiscount,
   formatPrice,
@@ -888,6 +888,11 @@ const initObserver = () => {
 // ===================================
 const init = () => {
   hideOrShowPromoUi();
+  onDiscountChange(() => {
+    hideOrShowPromoUi();
+    if (typeof window.renderProducts === "function") window.renderProducts();
+    if (window.SHGACart?.renderItems) window.SHGACart.renderItems();
+  });
   updateCartUI();
   initEvents();
   initObserver();

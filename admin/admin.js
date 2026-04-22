@@ -38,7 +38,7 @@ import {
 // Import reviews functionality
 import { initAdminReviews, saveAdminReview } from "../js/reviews.js";
 
-import { CONFIG, setDiscountEnabled } from "../js/config.js";
+import { CONFIG, setDiscountEnabled, onDiscountChange } from "../js/config.js";
 import { PRICE_UNAVAILABLE_TEXT } from "../js/utils/pricing.js";
 
 // NOTE: Firebase Storage is intentionally NOT used here.
@@ -99,8 +99,11 @@ function initAdminUI() {
   const discountToggle = document.getElementById("discountToggle");
   if (discountToggle) {
     discountToggle.checked = Boolean(CONFIG.discountEnabled);
+    onDiscountChange((enabled) => {
+      discountToggle.checked = Boolean(enabled);
+    });
     discountToggle.addEventListener("change", () => {
-      setDiscountEnabled(discountToggle.checked, { persist: true });
+      setDiscountEnabled(discountToggle.checked, { persist: true, persistRemote: true });
       toast(`Discount ${CONFIG.discountEnabled ? "enabled" : "disabled"} globally.`, "info", 2200);
     });
   }
