@@ -1,5 +1,3 @@
-export const DISCOUNT_RATE = 0.10;
-
 export const PRICE_UNAVAILABLE_TEXT = "Price unavailable";
 
 const WA_PHONE = "2348134421763";
@@ -29,12 +27,6 @@ export function isOthersProduct(product) {
   return Boolean(product && String(product.category) === "Others");
 }
 
-/** Global discount applies to storefront only when product is not "Others". */
-export function isDiscountActiveForProduct(product, discountEnabled) {
-  if (isOthersProduct(product)) return false;
-  return Boolean(discountEnabled);
-}
-
 /** WhatsApp deep link: product name + list price (Others only). */
 export function buildOthersWhatsAppUrl(product, selectedColorName) {
   const p = parseProductPrice(product);
@@ -44,12 +36,6 @@ export function buildOthersWhatsAppUrl(product, selectedColorName) {
   const colorPart = color ? ` — Color: ${color}` : "";
   const msg = `Hi SHGAdrip! I'd like to order: ${name}${colorPart} — ${priceTxt}`;
   return `https://wa.me/${WA_PHONE}?text=${encodeURIComponent(msg)}`;
-}
-
-export function applyDiscount(price, discountEnabled) {
-  const base = Number(price) || 0;
-  if (!discountEnabled) return base;
-  return base - base * DISCOUNT_RATE;
 }
 
 export function formatPrice(price) {
@@ -136,11 +122,11 @@ export function pricePassesMaxFilter(product, maxPrice) {
 }
 
 /**
- * Storefront price HTML (discount + optional prefix). Uses formatPrice (₦).
+ * Storefront price HTML (optional prefix). Uses formatPrice (₦).
  */
 export function buildStorefrontPriceHtml(
   priceValue,
-  { discountEnabled = false, prefix = "", suffix = "" } = {},
+  { prefix = "", suffix = "" } = {},
 ) {
   if (priceValue == null || priceValue === "") {
     return `<span class="price-unavailable">${PRICE_UNAVAILABLE_TEXT}</span>`;
@@ -152,12 +138,5 @@ export function buildStorefrontPriceHtml(
   const prefixHtml = prefix
     ? `<span class="price-prefix">${prefix}</span> `
     : "";
-  if (!discountEnabled) {
-    return `${prefixHtml}<span class="price-current">${formatPrice(base)}${suffix}</span>`;
-  }
-  const discounted = applyDiscount(base, true);
-  return (
-    `${prefixHtml}<span class="price-original">${formatPrice(base)}</span>` +
-    `<span class="price-discounted">${formatPrice(discounted)}${suffix}</span>`
-  );
+  return `${prefixHtml}<span class="price-current">${formatPrice(base)}${suffix}</span>`;
 }

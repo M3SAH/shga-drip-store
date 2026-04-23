@@ -3,17 +3,15 @@
  * Renders product.html?id=<firestoreDocId>
  */
 
-import { CONFIG, onDiscountChange } from "./config.js";
+import { CONFIG } from "./config.js";
 import {
   parseProductPrice,
   buildStorefrontPriceHtml,
   resolveLinePrice,
   getGradePriceOptions,
   formatPrice,
-  applyDiscount,
   isOthersProduct,
   buildOthersWhatsAppUrl,
-  isDiscountActiveForProduct,
   getProductImages,
 } from "./utils/pricing.js";
 
@@ -24,10 +22,7 @@ import {
   const $$ = (sel) => document.querySelectorAll(sel);
 
   const buildDiscountPriceHtml = (price, opts = {}, product = null) =>
-    buildStorefrontPriceHtml(price, {
-      ...opts,
-      discountEnabled: isDiscountActiveForProduct(product, CONFIG.discountEnabled),
-    });
+    buildStorefrontPriceHtml(price, opts);
 
   const SLEEVE_STYLES = [
     { id: "sleeved", name: "With Sleeves" },
@@ -50,21 +45,13 @@ import {
   function buildWaLink({ product, grade, sleeve, size, color }) {
     const basePrice = resolveLinePrice(product, grade);
     const baseNum = basePrice == null ? null : Number(basePrice);
-    const promoOn = isDiscountActiveForProduct(product, CONFIG.discountEnabled);
-    const discountPrice = baseNum != null ? applyDiscount(baseNum, promoOn) : null;
     const priceLabel = baseNum == null ? "Price unavailable" : formatPrice(baseNum);
-    const discLabel = discountPrice != null ? formatPrice(discountPrice) : "";
 
     const gradeInfo = (() => {
       if (baseNum == null) return "Price: unavailable — please confirm with seller";
-      if (!promoOn) {
-        return grade
-          ? `Shirt Grade: ${grade.name} — ${priceLabel}`
-          : `Price: ${priceLabel}`;
-      }
       return grade
-        ? `Shirt Grade: ${grade.name} — ${priceLabel} → ${discLabel} (10% OFF)`
-        : `Price: ${priceLabel} → ${discLabel} (10% OFF)`;
+        ? `Shirt Grade: ${grade.name} — ${priceLabel}`
+        : `Price: ${priceLabel}`;
     })();
 
     const imageUrl = product.imageUrl || product.image || "";
@@ -152,9 +139,6 @@ import {
   }
 
   function renderProductPage() {
-    document.querySelectorAll(".promo-banner").forEach((el) => {
-      el.style.display = CONFIG.discountEnabled ? "" : "none";
-    });
     const id = productIdFromUrl();
     const shell = $("productShell");
 
@@ -404,12 +388,10 @@ import {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       initNav();
-      onDiscountChange(() => renderProductPage());
       renderProductPage();
     });
   } else {
     initNav();
-    onDiscountChange(() => renderProductPage());
     renderProductPage();
   }
 })();

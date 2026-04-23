@@ -3,7 +3,7 @@
  * Renderer for /collections — pagination, filters, shared pricing helpers.
  */
 
-import { CONFIG, onDiscountChange } from "./config.js";
+import { CONFIG } from "./config.js";
 import {
   parseProductPrice,
   buildStorefrontPriceHtml,
@@ -12,7 +12,6 @@ import {
   formatPrice,
   isOthersProduct,
   buildOthersWhatsAppUrl,
-  isDiscountActiveForProduct,
   getProductImages,
 } from "./utils/pricing.js";
 
@@ -23,10 +22,7 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 const buildDiscountPriceHtml = (price, opts = {}, product = null) =>
-  buildStorefrontPriceHtml(price, {
-    ...opts,
-    discountEnabled: isDiscountActiveForProduct(product, CONFIG.discountEnabled),
-  });
+  buildStorefrontPriceHtml(price, opts);
 
 function normalizeText(s) {
   return String(s || "").toLowerCase().trim();
@@ -334,18 +330,6 @@ function renderPagination(totalItems) {
 }
 
 if (grid) {
-  document.querySelectorAll(".promo-banner").forEach((el) => {
-    el.style.display = CONFIG.discountEnabled ? "" : "none";
-  });
-
-  onDiscountChange(() => {
-    document.querySelectorAll(".promo-banner").forEach((el) => {
-      el.style.display = CONFIG.discountEnabled ? "" : "none";
-    });
-    if (typeof window.renderProducts === "function") window.renderProducts();
-    if (window.SHGACart?.renderItems) window.SHGACart.renderItems();
-  });
-
   window.renderProducts = () => {
     const list = computeFiltered();
     state.currentList = list;

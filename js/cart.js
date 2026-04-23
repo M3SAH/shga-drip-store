@@ -11,7 +11,7 @@
 
 (() => {
   const STORAGE_KEY = "shgadrip_cart_v1";
-  const isDiscountEnabled = () => localStorage.getItem("discountEnabled") !== "false";
+
 
   const SHIRT_COLORS = [
     { id: "white",      name: "White",      hex: "#FFFFFF" },
@@ -28,17 +28,9 @@
   ];
 
   const fmt = (price) => `\u20a6${Number(price || 0).toLocaleString("en-NG")}`;
-  // global promo discount (used in other scripts too)
-  const DISCOUNT_RATE = 0.10;
   const isOthersItem = (item) => String(item?.category || "") === "Others";
-  const applyDiscount = (price) => {
-    const base = Number(price || 0);
-    if (!isDiscountEnabled()) return base;
-    return Math.round(base * (1 - DISCOUNT_RATE));
-  };
   /** Unit price after promo (Others items never discounted). */
-  const unitPriceForCart = (item) =>
-    isOthersItem(item) ? Number(item.price || 0) : applyDiscount(item.price);
+  const unitPriceForCart = (item) => Number(item.price || 0);
   // ── Persistence ────────────────────────────────────────────────
   function load() {
     try {
@@ -88,15 +80,9 @@
     if (cartEmptyMsg) cartEmptyMsg.style.display = "none";
     if (cartWaBtn)    cartWaBtn.style.display    = "block";
 
-    const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    const discountedTotal = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
-    const hasEligiblePromo =
-      isDiscountEnabled() && cart.some((i) => !isOthersItem(i));
+    const totalPrice = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
     if (cartTotal) {
-      cartTotal.innerHTML = hasEligiblePromo
-        ? `<span class="price-original">${fmt(totalPrice)}</span>
-           <span class="price-discounted">${fmt(discountedTotal)}</span>`
-        : `<span class="price-current">${fmt(discountedTotal)}</span>`;
+      cartTotal.innerHTML = `<span class="price-current">${fmt(totalPrice)}</span>`;
     }
 
     cartItems.innerHTML = cart.map((item, idx) => {
@@ -122,12 +108,7 @@
             <span class="cart-item-color-name">${item.color || ""}</span>
           </div>
           <p class="cart-item-price">
-            ${
-              isDiscountEnabled() && !isOthersItem(item)
-                ? `<span class="price-original">${fmt(item.price)}</span>
-                   <span class="price-discounted">${fmt(applyDiscount(item.price))}</span>`
-                : `<span class="price-current">${fmt(item.price)}</span>`
-            }
+            <span class="price-current">${fmt(item.price)}</span>
           </p>
         </div>
         <div class="cart-item-right">
@@ -158,8 +139,6 @@
       ? `<img class="cart-toast-img" src="${imageUrl}" alt="${name}" loading="lazy" onerror="this.style.display='none'">`
       : "";
 
-    const promoRow = isDiscountEnabled() && String(category || "") !== "Others";
-    const discounted = applyDiscount(price);
     toast.innerHTML =
       imgHtml +
       `<i class="fa-solid fa-circle-check"></i>` +
@@ -168,9 +147,7 @@
       `${size   ? ` · ${size}`   : ""}` +
       `${sleeve ? ` · ${sleeve}` : ""}` +
       `${color  ? ` · ${color}`  : ""}` +
-      (promoRow
-        ? ` — <span class="price-original">${fmt(price)}</span> <span class="price-discounted">${fmt(discounted)}</span></span>`
-        : ` — <span class="price-current">${fmt(price)}</span></span>`);
+      ` — <span class="price-current">${fmt(price)}</span></span>`;
     document.body.appendChild(toast);
     setTimeout(() => toast.classList.add("visible"), 10);
     setTimeout(() => {
@@ -186,13 +163,8 @@
     const lines = cart.map((item, i) => {
       const productPageUrl = `${baseUrl}/product.html?id=${encodeURIComponent(item.productId)}`;
       const imgLink = item.imageUrl ? item.imageUrl : productPageUrl;
-      const lineBaseTotal = Number(item.price || 0) * item.quantity;
-      const others = isOthersItem(item);
-      const lineDiscountTotal = others ? lineBaseTotal : applyDiscount(item.price) * item.quantity;
-      const priceLine =
-        others || !isDiscountEnabled()
-          ? ` — ${fmt(lineBaseTotal)}`
-          : ` — Original: ${fmt(lineBaseTotal)} → ${fmt(lineDiscountTotal)} (10% OFF)`;
+      const lineTotal = Number(item.price || 0) * item.quantity;
+      const priceLine = ` — ${fmt(lineTotal)}`;
       return (
         `${i + 1}. ${item.design}` +
         (item.shirtGrade  ? ` · ${item.shirtGrade} Grade`  : "") +
@@ -204,13 +176,8 @@
         `\n   🔗 View: ${productPageUrl}`
       );
     }).join("\n\n");
-    const originalTotal = cart.reduce((s, i) => s + Number(i.price || 0) * i.quantity, 0);
-    const discountedTotal = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
-    const showPromoTotals = isDiscountEnabled() && cart.some((i) => !isOthersItem(i));
-    const totalsBlock = showPromoTotals
-      ? `Cart Total (before discount): ${fmt(originalTotal)}\n` +
-        `Cart Total after 10% OFF (eligible items): ${fmt(discountedTotal)}\n\n`
-      : `Cart Total: ${fmt(discountedTotal)}\n\n`;
+    const total = cart.reduce((s, i) => s + unitPriceForCart(i) * i.quantity, 0);
+    const totalsBlock = `Cart Total: ${fmt(total)}\n\n`;
     const msg = `Hi SHGAdrip! Here's my order:
 
 ${lines}
@@ -313,14 +280,6 @@ ${lines}
         const panel = $("cartPanel");
         if (panel && panel.classList.contains("open")) closeCart();
       }
-    });
-
-    window.addEventListener("storage", (e) => {
-      if (e.key !== "discountEnabled") return;
-      renderCartItems();
-    });
-    window.addEventListener("shgadrip:discount-changed", () => {
-      renderCartItems();
     });
 
     // Hydrate badge on load

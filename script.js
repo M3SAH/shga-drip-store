@@ -20,9 +20,8 @@
 
 // Import reviews functionality
 import { initPublicReviews } from "./js/reviews.js";
-import { CONFIG, onDiscountChange } from "./js/config.js";
+import { CONFIG } from "./js/config.js";
 import {
-  applyDiscount,
   formatPrice,
   parseProductPrice,
   getGradePriceOptions,
@@ -31,15 +30,8 @@ import {
   buildStorefrontPriceHtml,
   isOthersProduct,
   buildOthersWhatsAppUrl,
-  isDiscountActiveForProduct,
   getProductImages,
 } from "./js/utils/pricing.js";
-
-const hideOrShowPromoUi = () => {
-  document.querySelectorAll(".promo-banner").forEach((el) => {
-    el.style.display = CONFIG.discountEnabled ? "" : "none";
-  });
-};
 
 // ===================================
 // COLOR CATALOG
@@ -137,10 +129,7 @@ const cartEmptyMsg = $("cartEmptyMsg");
 // UTILS
 // ===================================
 const buildDiscountPriceHtml = (price, opts = {}, product = null) =>
-  buildStorefrontPriceHtml(price, {
-    ...opts,
-    discountEnabled: isDiscountActiveForProduct(product, CONFIG.discountEnabled),
-  });
+  buildStorefrontPriceHtml(price, opts);
 
 const escapeHtml = (s) =>
   String(s ?? "")
@@ -162,20 +151,12 @@ const buildSingleWaLink = (product, grade, color) => {
   const phone      = "2348134421763";
   const basePrice  = resolveLinePrice(product, grade);
   const baseNum    = basePrice == null ? null : Number(basePrice);
-  const promoOn    = isDiscountActiveForProduct(product, CONFIG.discountEnabled);
-  const discountPrice = baseNum != null ? applyDiscount(baseNum, promoOn) : null;
   const priceLabel = baseNum == null ? "Price unavailable" : formatPrice(baseNum);
-  const discLabel  = discountPrice != null ? formatPrice(discountPrice) : "";
   const gradeInfo  = (() => {
     if (baseNum == null) return "Price: unavailable — please confirm with seller";
-    if (!promoOn) {
-      return grade
-        ? `Shirt Grade: ${grade.name} — ${priceLabel}`
-        : `Price: ${priceLabel}`;
-    }
     return grade
-      ? `Shirt Grade: ${grade.name} — ${priceLabel} → ${discLabel} (10% OFF)`
-      : `Price: ${priceLabel} → ${discLabel} (10% OFF)`;
+      ? `Shirt Grade: ${grade.name} — ${priceLabel}`
+      : `Price: ${priceLabel}`;
   })();
   const colorInfo  = color ? `Color: ${color.name}${color.isCustom ? " (custom — please specify)" : ""}` : "";
   const sleeveInfo = product.type !== "sleeveless" && state.selectedSleeve ? `Sleeve Style: ${state.selectedSleeve.name}` : "";
@@ -814,7 +795,6 @@ const handleOrderSubmit = (e) => {
     `Hi SHGAdrip! I'd like to place an order:\n\n` +
     `Name: ${name}\nPhone: ${phone}\nSize: ${size}\n` +
     `Quality/Grade: ${quality}\nColor: ${color}\nDesign: ${design}\n\n` +
-    (CONFIG.discountEnabled ? `Note: 10% OFF promo applies to eligible items.\n\n` : "") +
     `Please confirm details. Thanks!`;
   window.open(`https://wa.me/2348134421763?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   orderForm.reset();
@@ -930,12 +910,6 @@ const initObserver = () => {
 //      empty grid before Firebase responds.
 // ===================================
 const init = () => {
-  hideOrShowPromoUi();
-  onDiscountChange(() => {
-    hideOrShowPromoUi();
-    if (typeof window.renderProducts === "function") window.renderProducts();
-    if (window.SHGACart?.renderItems) window.SHGACart.renderItems();
-  });
   updateCartUI();
   initEvents();
   initObserver();
